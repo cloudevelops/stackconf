@@ -21,15 +21,15 @@
 package cmd
 
 import (
-	"fmt"
-	"os"
-	"os/exec"
 	"bytes"
 	"encoding/json"
+	"fmt"
+	"github.com/juju/loggo"
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/juju/loggo"
+	"os"
+	"os/exec"
 )
 
 var cfgFile string
@@ -39,7 +39,7 @@ var log = loggo.GetLogger("cmd")
 var RootCmd = &cobra.Command{
 	Use:   "stackconf",
 	Short: "Openstack instance config management with ease",
-	Long: `Openstack instance config management with ease`,
+	Long:  `Openstack instance config management with ease`,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	//	Run: func(cmd *cobra.Command, args []string) { },
@@ -55,7 +55,7 @@ func Execute() {
 }
 
 func init() {
-  loggo.ConfigureLoggers("<root>=TRACE")
+	loggo.ConfigureLoggers("<root>=TRACE")
 	cobra.OnInitialize(initConfig)
 
 	// Here you will define your flags and configuration settings.
@@ -87,17 +87,17 @@ func initConfig() {
 		viper.SetConfigName(".stackconf")
 	}
 
-  viper.SetDefault("stackconf.tools", "puppet")
-	viper.SetDefault("stackconf.sources", []string{"openstackmeta","puppetfacter"})
+	viper.SetDefault("stackconf.tools", "puppet")
+	viper.SetDefault("stackconf.sources", []string{"openstackmeta", "puppetfacter"})
 
 	viper.AutomaticEnv() // read in environment variables that match
 
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {
-		log.Debugf("Using config file: "+viper.ConfigFileUsed())
+		log.Debugf("Using config file: " + viper.ConfigFileUsed())
 	}
-  // Detect and load Facter source
-  if isInArray("puppetfacter",viper.GetStringSlice("stackconf.sources")) {
+	// Detect and load Facter source
+	if isInArray("puppetfacter", viper.GetStringSlice("stackconf.sources")) {
 		log.Debugf("Facter enabled: starting")
 		if err := facter(); err != nil {
 			log.Errorf("Facter failed: critical error")
@@ -106,45 +106,45 @@ func initConfig() {
 }
 
 func isInArray(val string, array []string) (ok bool) {
-	  var i int
-    for i = range array {
-        if ok = array[i] == val; ok {
-            return
-        }
-    }
-    return
+	var i int
+	for i = range array {
+		if ok = array[i] == val; ok {
+			return
+		}
+	}
+	return
 }
 
 func facter() (err error) {
-	  type puppetFacter struct {
-			Puppetfacter map[string]interface{} `json:"puppetfacter"`
-		}
-		var facterdata interface{}
-    // Run facter and output JSON
-		cmd := exec.Command("facter","-j")
-    var outb  bytes.Buffer
-    cmd.Stdout = &outb
-    err = cmd.Run()
-    if err != nil {
-      log.Debugf("Facter execution failed !")
-			return
-    }
-		// Unmarshall JSON into plain interface
-    err = json.Unmarshal(outb.Bytes(), &facterdata)
-		if err != nil {
-			log.Debugf("Facter JSON Unmarshall failed !")
-			return
-    }
-		// Map JSON and prepend it with puppetfacter key
-		m := facterdata.(map[string]interface{})
-    factermash, err := json.Marshal(puppetFacter{Puppetfacter: m})
-		if err != nil {
-			log.Debugf("Facter JSON prepend failed !")
-			return
-    }
-		// Load final JSON into Viper
-		viper.SetConfigType("json")
-		viper.ReadConfig(bytes.NewReader(factermash))
-    log.Debugf("Facter version: "+viper.GetString("puppetfacter.facterversion"))
-    return
+	type puppetFacter struct {
+		Puppetfacter map[string]interface{} `json:"puppetfacter"`
+	}
+	var facterdata interface{}
+	// Run facter and output JSON
+	cmd := exec.Command("facter", "-j")
+	var outb bytes.Buffer
+	cmd.Stdout = &outb
+	err = cmd.Run()
+	if err != nil {
+		log.Debugf("Facter execution failed !")
+		return
+	}
+	// Unmarshall JSON into plain interface
+	err = json.Unmarshal(outb.Bytes(), &facterdata)
+	if err != nil {
+		log.Debugf("Facter JSON Unmarshall failed !")
+		return
+	}
+	// Map JSON and prepend it with puppetfacter key
+	m := facterdata.(map[string]interface{})
+	factermash, err := json.Marshal(puppetFacter{Puppetfacter: m})
+	if err != nil {
+		log.Debugf("Facter JSON prepend failed !")
+		return
+	}
+	// Load final JSON into Viper
+	viper.SetConfigType("json")
+	viper.ReadConfig(bytes.NewReader(factermash))
+	log.Debugf("Facter version: " + viper.GetString("puppetfacter.facterversion"))
+	return
 }

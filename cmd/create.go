@@ -21,19 +21,19 @@
 package cmd
 
 import (
-//	"fmt"
+	//	"fmt"
 
 	"github.com/spf13/cobra"
-//	"github.com/spf13/viper"
+	//	"github.com/spf13/viper"
 )
 
 // createCmd represents the create command
 var createCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a new stackconf host",
-	Long: `Create a new stackconf host.`,
+	Long:  `Create a new stackconf host.`,
 	Run: func(cmd *cobra.Command, args []string) {
-    log.Debugf("Create command: starting")
+		log.Debugf("Create command: starting")
 	},
 }
 
