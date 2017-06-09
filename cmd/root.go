@@ -30,10 +30,13 @@ import (
 	"github.com/spf13/viper"
 	"os"
 	"os/exec"
+	"net/http"
+	"io/ioutil"
 )
 
 var cfgFile string
 var log = loggo.GetLogger("cmd")
+var httpClient = &http.Client{Timeout: 10}
 
 // RootCmd represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{
@@ -103,6 +106,14 @@ func initConfig() {
 			log.Errorf("Facter failed: critical error")
 		}
 	}
+
+	// Detect and load Openstackmeta source
+	if isInArray("openstackmeta", viper.GetStringSlice("stackconf.sources")) {
+		log.Debugf("Openstackmeta enabled: starting")
+		if err := openstackMeta(); err != nil {
+			log.Errorf("Openstackmeta failed: critical error")
+		}
+	}
 }
 
 func isInArray(val string, array []string) (ok bool) {
@@ -146,5 +157,32 @@ func facter() (err error) {
 	viper.SetConfigType("json")
 	viper.ReadConfig(bytes.NewReader(factermash))
 	log.Debugf("Facter version: " + viper.GetString("puppetfacter.facterversion"))
+	return
+}
+
+func openstackMeta() (err error) {
+	var metadata interface{}
+
+	r, err := httpClient.Get("http://169.254.169.254/openstack/latest/meta_data.json")
+	if err != nil {
+		log.Errorf("HTTP request to Openstack Metadata failed !")
+		return
+	}
+	if r.StatusCode < 200 || r.StatusCode > 299 {
+		log.Errorf("HTTP request to Openstack Metadata failed, error: " + r.Status + "!")
+		return
+	}
+	response, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		log.Errorf("Error reading body !")
+		return
+	}
+	err = json.Unmarshal(response, &metadata)
+	if err != nil {
+		log.Errorf("Error while reading JSON !")
+		return
+	}
+	m := metadata.(map[string]interface{})
+	fmt.Println(m)
 	return
 }
