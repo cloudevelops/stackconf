@@ -32,11 +32,15 @@ import (
 	"os/exec"
 	"net/http"
 	"io/ioutil"
+    "time"
+    //"github.com/davecgh/go-spew/spew"
+    "strings"
 )
 
 var cfgFile string
 var log = loggo.GetLogger("cmd")
-var httpClient = &http.Client{Timeout: 10}
+var httpClient = &http.Client{ Timeout: time.Second * 10 }
+var metaData map[string]interface{}
 
 // RootCmd represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{
@@ -155,13 +159,18 @@ func facter() (err error) {
 	}
 	// Load final JSON into Viper
 	viper.SetConfigType("json")
-	viper.ReadConfig(bytes.NewReader(factermash))
+	viper.MergeConfig(bytes.NewReader(factermash))
 	log.Debugf("Facter version: " + viper.GetString("puppetfacter.facterversion"))
 	return
 }
 
 func openstackMeta() (err error) {
+    type openstackMetadata struct {
+        Openstackmetadata map[string]interface{} `json:"openstackmeta"`
+    }
 	var metadata interface{}
+    var mv map[string]interface{}
+    var envmeta string
 
 	r, err := httpClient.Get("http://169.254.169.254/openstack/latest/meta_data.json")
 	if err != nil {
@@ -183,6 +192,58 @@ func openstackMeta() (err error) {
 		return
 	}
 	m := metadata.(map[string]interface{})
-	fmt.Println(m)
+	// Map JSON and prepend it with openstackmeta key
+	metamash, err := json.Marshal(openstackMetadata{Openstackmetadata: m})
+	if err != nil {
+		log.Debugf("Openstackmeta JSON prepend failed !")
+		return
+	}
+	// Load Openstack metadata into Viper
+	viper.SetConfigType("json")
+	viper.MergeConfig(bytes.NewReader(metamash))
+    log.Debugf("Openstack metadata loaded into config, instance name: " + viper.GetString("openstackmeta.name"))
+	// Iterate through raw Opentack metadata and extract host and environment metadata
+    for k, v := range m {
+		if k == "meta" {
+			mv = v.(map[string]interface{})
+			for sk, sv := range mv {
+				if sk == "metadata" {
+                    envmeta = sv.(string)
+				}
+			}
+		}
+	}
+    // Iterate again, append to environment metadata and overwrite if needed
+    err = json.Unmarshal([]byte(envmeta), &metaData)
+    if err != nil {
+        log.Debugf("Failed to Unmarshal env metadata:" + envmeta + " !")
+        return
+    }
+    for k, v := range mv {
+        if k != "metadata" {
+            metaData[k] = v
+        }
+    }
+    // Marshall metadata
+    hostmetadata, err := json.Marshal(metaData)
+	if err != nil {
+	    log.Debugf("Openstackmeta JSON prepend failed !")
+	    return
+	}
+    // Load host metadata to config
+	viper.SetConfigType("json")
+    viper.MergeConfig(bytes.NewReader(hostmetadata))
+    log.Debugf("Host metadata from openstack loaded into config")
 	return
+}
+
+func metaGetMerge (key string) (parameter map[string]string, err error) {
+    parameter = make(map[string]string)
+    for k, v := range metaData {
+        if strings.Contains(k, key) {
+            newkey := strings.Replace(k, key+".","",-1)
+            parameter[newkey] = v.(string)
+        }
+    }
+    return
 }
