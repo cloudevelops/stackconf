@@ -28,18 +28,18 @@ import (
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"io/ioutil"
+	"net/http"
 	"os"
 	"os/exec"
-	"net/http"
-	"io/ioutil"
-    "time"
-    //"github.com/davecgh/go-spew/spew"
-    "strings"
+	"time"
+	//"github.com/davecgh/go-spew/spew"
+	"strings"
 )
 
 var cfgFile string
 var log = loggo.GetLogger("cmd")
-var httpClient = &http.Client{ Timeout: time.Second * 10 }
+var httpClient = &http.Client{Timeout: time.Second * 10}
 var metaData map[string]interface{}
 
 // RootCmd represents the base command when called without any subcommands
@@ -136,7 +136,7 @@ func facter() (err error) {
 	}
 	var facterdata interface{}
 	// Run facter and output JSON
-	cmd := exec.Command("facter", "-j")
+	cmd := exec.Command("/opt/puppetlabs/bin/facter", "-j")
 	var outb bytes.Buffer
 	cmd.Stdout = &outb
 	err = cmd.Run()
@@ -165,12 +165,12 @@ func facter() (err error) {
 }
 
 func openstackMeta() (err error) {
-    type openstackMetadata struct {
-        Openstackmetadata map[string]interface{} `json:"openstackmeta"`
-    }
+	type openstackMetadata struct {
+		Openstackmetadata map[string]interface{} `json:"openstackmeta"`
+	}
 	var metadata interface{}
-    var mv map[string]interface{}
-    var envmeta string
+	var mv map[string]interface{}
+	var envmeta string
 
 	r, err := httpClient.Get("http://169.254.169.254/openstack/latest/meta_data.json")
 	if err != nil {
@@ -201,49 +201,49 @@ func openstackMeta() (err error) {
 	// Load Openstack metadata into Viper
 	viper.SetConfigType("json")
 	viper.MergeConfig(bytes.NewReader(metamash))
-    log.Debugf("Openstack metadata loaded into config, instance name: " + viper.GetString("openstackmeta.name"))
+	log.Debugf("Openstack metadata loaded into config, instance name: " + viper.GetString("openstackmeta.name"))
 	// Iterate through raw Opentack metadata and extract host and environment metadata
-    for k, v := range m {
+	for k, v := range m {
 		if k == "meta" {
 			mv = v.(map[string]interface{})
 			for sk, sv := range mv {
 				if sk == "metadata" {
-                    envmeta = sv.(string)
+					envmeta = sv.(string)
 				}
 			}
 		}
 	}
-    // Iterate again, append to environment metadata and overwrite if needed
-    err = json.Unmarshal([]byte(envmeta), &metaData)
-    if err != nil {
-        log.Debugf("Failed to Unmarshal env metadata:" + envmeta + " !")
-        return
-    }
-    for k, v := range mv {
-        if k != "metadata" {
-            metaData[k] = v
-        }
-    }
-    // Marshall metadata
-    hostmetadata, err := json.Marshal(metaData)
+	// Iterate again, append to environment metadata and overwrite if needed
+	err = json.Unmarshal([]byte(envmeta), &metaData)
 	if err != nil {
-	    log.Debugf("Openstackmeta JSON prepend failed !")
-	    return
+		log.Debugf("Failed to Unmarshal env metadata:" + envmeta + " !")
+		return
 	}
-    // Load host metadata to config
+	for k, v := range mv {
+		if k != "metadata" {
+			metaData[k] = v
+		}
+	}
+	// Marshall metadata
+	hostmetadata, err := json.Marshal(metaData)
+	if err != nil {
+		log.Debugf("Openstackmeta JSON prepend failed !")
+		return
+	}
+	// Load host metadata to config
 	viper.SetConfigType("json")
-    viper.MergeConfig(bytes.NewReader(hostmetadata))
-    log.Debugf("Host metadata from openstack loaded into config")
+	viper.MergeConfig(bytes.NewReader(hostmetadata))
+	log.Debugf("Host metadata from openstack loaded into config")
 	return
 }
 
-func metaGetMerge (key string) (parameter map[string]string, err error) {
-    parameter = make(map[string]string)
-    for k, v := range metaData {
-        if strings.Contains(k, key) {
-            newkey := strings.Replace(k, key+".","",-1)
-            parameter[newkey] = v.(string)
-        }
-    }
-    return
+func metaGetMerge(key string) (parameter map[string]string, err error) {
+	parameter = make(map[string]string)
+	for k, v := range metaData {
+		if strings.Contains(k, key) {
+			newkey := strings.Replace(k, key+".", "", -1)
+			parameter[newkey] = v.(string)
+		}
+	}
+	return
 }
