@@ -26,6 +26,13 @@ mkdir -p ~/go
 go get github.com/cloudevelops/stackconf
 ```
 
+## setup fpm for packaging
+
+```
+sudo apt-get install ruby-dev -y
+sudo gem install fpm
+```
+
 ## optionally, setup go-enabled vim
 
 ```
