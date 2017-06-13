@@ -21,7 +21,7 @@
 package cmd
 
 import (
-	//    "github.com/davecgh/go-spew/spew"
+	//	"github.com/davecgh/go-spew/spew"
 	"encoding/json"
 	"github.com/cloudevelops/go-foreman"
 	"github.com/spf13/cobra"
@@ -149,14 +149,14 @@ var createCmd = &cobra.Command{
 			return
 		}
 		// operatingsystem
-        osName := viper.GetString("puppetfacter.os.name")
-        var operatingSystemName string
-        if osName == "Ubuntu" {
-            operatingSystemName = viper.GetString("puppetfacter.os.distro.description")
-        } else {
-            operatingSystemName = viper.GetString("puppetfacter.os.distro.id")+" "+viper.GetString("puppetfacter.os.distro.release.full")
-        }
-        if operatingSystemName == "" {
+		osName := viper.GetString("puppetfacter.os.name")
+		var operatingSystemName string
+		if osName == "Ubuntu" {
+			operatingSystemName = viper.GetString("puppetfacter.os.distro.description")
+		} else {
+			operatingSystemName = viper.GetString("puppetfacter.os.distro.id") + " " + viper.GetString("puppetfacter.os.distro.release.full")
+		}
+		if operatingSystemName == "" {
 			log.Debugf("Operating System not found !")
 			return
 		}
@@ -185,20 +185,34 @@ var createCmd = &cobra.Command{
 		} else {
 			log.Debugf("Mac Address: " + macAddress)
 		}
+		// parameters
+		var parameters []map[string]string
+		var paramMap map[string]string
+		metaparameters, err := metaGetMerge("foreman.host.parameter")
+		for metak, metav := range metaparameters {
+			paramMap = make(map[string]string)
+			paramMap["name"] = metak
+			paramMap["value"] = metav
+			parameters = append(parameters, paramMap)
+		}
+		if err != nil {
+			log.Debugf("Did not find host parameters")
+		}
 		// create host
 		type HostResource struct {
-			HostGroupId         string `json:"hostgroup_id"`
-			PuppetCaId          string `json:"puppet_ca_proxy_id"`
-			LocationId          string `json:"location_id"`
-			OrganizationId      string `json:"organization_id"`
-			PuppetEnvironmentId string `json:"environment_id"`
-			DomainId            string `json:"domain_id"`
-			OperatingSystemId   string `json:"operatingsystem_id"`
-			ArchitectureId      string `json:"architecture_id"`
-			Name                string `json:"name"`
-			Mac                 string `json:"mac"`
-			Ip                  string `json:"ip"`
-			Build               bool   `json:"build"`
+			HostGroupId         string              `json:"hostgroup_id"`
+			PuppetCaId          string              `json:"puppet_ca_proxy_id"`
+			LocationId          string              `json:"location_id"`
+			OrganizationId      string              `json:"organization_id"`
+			PuppetEnvironmentId string              `json:"environment_id"`
+			DomainId            string              `json:"domain_id"`
+			OperatingSystemId   string              `json:"operatingsystem_id"`
+			ArchitectureId      string              `json:"architecture_id"`
+			Name                string              `json:"name"`
+			Mac                 string              `json:"mac"`
+			Ip                  string              `json:"ip"`
+			Build               bool                `json:"build"`
+			Parameters          []map[string]string `json:"host_parameters_attributes"`
 		}
 		type HostMap map[string]HostResource
 
@@ -217,6 +231,7 @@ var createCmd = &cobra.Command{
 			Mac:                 macAddress,
 			Ip:                  ipAddress,
 			Build:               false,
+			Parameters:          parameters,
 		}
 		jsonText, err := json.Marshal(hostMap)
 		data, err := f.Post("hosts", jsonText)

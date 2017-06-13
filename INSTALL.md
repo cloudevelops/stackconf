@@ -29,5 +29,6 @@ go get github.com/cloudevelops/stackconf
 ## optionally, setup go-enabled vim
 
 ```
+sudo apt-get install -y vim-nox
 curl https://j.mp/spf13-vim3 -L -o - | sh
 ```
