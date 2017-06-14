@@ -26,12 +26,12 @@ import (
 	"github.com/cloudevelops/go-foreman"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"os/exec"
 	"strconv"
 	"strings"
-    "os/exec"
-    //"bytes"
-    "fmt"
-    "bufio"
+	//"bytes"
+	"bufio"
+	"fmt"
 )
 
 // createCmd represents the create command
@@ -246,65 +246,65 @@ var createCmd = &cobra.Command{
 		hostId := strconv.FormatFloat(data["id"].(float64), 'f', 0, 64)
 		log.Debugf("Host created, id: " + hostId)
 		// Configure Puppet execution
-        puppetServer := viper.GetString("puppet.config.server")
-        var puppetParam []string
+		puppetServer := viper.GetString("puppet.config.server")
+		var puppetParam []string
 		if puppetServer == "" {
 			log.Debugf("Puppet Server not found !")
-            puppetSrv := viper.GetString("puppet.config.srv")
-            if puppetSrv == "" {
-                log.Errorf("Puppet Server or SRV not found, exiting !")
-                return
-            } else {
-                log.Debugf("Puppet will run in SRV mode in domain: "+puppetSrv)
-                puppetParam = []string{"agent","-tv","--use_srv_records","--srv_domain",puppetSrv}
-            }
-        } else {
-            log.Debugf("Puppet will run in server mode with server: "+puppetServer)
-            puppetParam = []string{"agent","-tv","--no-use_srv_records","--server",puppetServer}
-        }
-        // Enable Puppet
-        log.Debugf("Enabling puppet")
-        puppetEnabler := exec.Command("/opt/puppetlabs/bin/puppet", "agent", "--enable")
-        c := make(chan struct{})
-        go runCommand(puppetEnabler, c)
-        c <- struct{}{}
-        puppetEnabler.Start()
-        <-c
-        if err := puppetEnabler.Wait(); err != nil {
-            log.Debugf("Error executing puppet !")
-        }
-        // Run Puppet
-        puppetRuns := viper.GetInt("puppet.config.runs")
-        for r := 1; r<=puppetRuns; r++ {
-            // Run puppet
-            runCount := strconv.Itoa(r)
-            log.Debugf("Running puppet, run #"+runCount)
-            //spew.Dump(puppetParam)
-            cmd := exec.Command("/opt/puppetlabs/bin/puppet", puppetParam...)
-            c := make(chan struct{})
-            go runCommand(cmd, c)
-            c <- struct{}{}
-            cmd.Start()
-            <-c
-            if err := cmd.Wait(); err != nil {
-                log.Debugf("Error executing puppet !")
-            }
-        }
+			puppetSrv := viper.GetString("puppet.config.srv")
+			if puppetSrv == "" {
+				log.Errorf("Puppet Server or SRV not found, exiting !")
+				return
+			} else {
+				log.Debugf("Puppet will run in SRV mode in domain: " + puppetSrv)
+				puppetParam = []string{"agent", "-tv", "--use_srv_records", "--srv_domain", puppetSrv}
+			}
+		} else {
+			log.Debugf("Puppet will run in server mode with server: " + puppetServer)
+			puppetParam = []string{"agent", "-tv", "--no-use_srv_records", "--ca_server", puppetCaName, "--server", puppetServer}
+		}
+		// Enable Puppet
+		log.Debugf("Enabling puppet")
+		puppetEnabler := exec.Command("/opt/puppetlabs/bin/puppet", "agent", "--enable")
+		c := make(chan struct{})
+		go runCommand(puppetEnabler, c)
+		c <- struct{}{}
+		puppetEnabler.Start()
+		<-c
+		if err := puppetEnabler.Wait(); err != nil {
+			log.Debugf("Error executing puppet !")
+		}
+		// Run Puppet
+		puppetRuns := viper.GetInt("puppet.config.runs")
+		for r := 1; r <= puppetRuns; r++ {
+			// Run puppet
+			runCount := strconv.Itoa(r)
+			log.Debugf("Running puppet, run #" + runCount)
+			//spew.Dump(puppetParam)
+			cmd := exec.Command("/opt/puppetlabs/bin/puppet", puppetParam...)
+			c := make(chan struct{})
+			go runCommand(cmd, c)
+			c <- struct{}{}
+			cmd.Start()
+			<-c
+			if err := cmd.Wait(); err != nil {
+				log.Debugf("Error executing puppet !")
+			}
+		}
 	},
 }
 
 func runCommand(cmd *exec.Cmd, c chan struct{}) {
-    defer func() { c <- struct{}{}  }()
-    stdout, err := cmd.StdoutPipe()
-    if err != nil {
-        panic(err)
-    }
-    <-c
-    scanner := bufio.NewScanner(stdout)
-    for scanner.Scan() {
-        m := scanner.Text()
-        fmt.Println(m)
-    }
+	defer func() { c <- struct{}{} }()
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		panic(err)
+	}
+	<-c
+	scanner := bufio.NewScanner(stdout)
+	for scanner.Scan() {
+		m := scanner.Text()
+		fmt.Println(m)
+	}
 }
 
 func init() {
