@@ -96,6 +96,7 @@ func initConfig() {
 
 	viper.SetDefault("stackconf.tools", "puppet")
 	viper.SetDefault("stackconf.sources", []string{"openstackmeta", "puppetfacter"})
+	viper.SetDefault("puppet.config.runs", 3)
 
 	viper.AutomaticEnv() // read in environment variables that match
 
