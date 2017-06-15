@@ -21,7 +21,7 @@
 package cmd
 
 import (
-	//"github.com/davecgh/go-spew/spew"
+	//	"github.com/davecgh/go-spew/spew"
 	"encoding/json"
 	"github.com/cloudevelops/go-foreman"
 	"github.com/spf13/cobra"
@@ -32,6 +32,7 @@ import (
 	//"bytes"
 	"bufio"
 	"fmt"
+	"github.com/cloudevelops/go-powerdns"
 )
 
 // createCmd represents the create command
@@ -245,6 +246,41 @@ var createCmd = &cobra.Command{
 		}
 		hostId := strconv.FormatFloat(data["id"].(float64), 'f', 0, 64)
 		log.Debugf("Host created, id: " + hostId)
+
+		// Configure DNS
+		dnsHost := viper.GetString("dns.config.host")
+		if dnsHost == "" {
+			log.Debugf("DNS host not configure, skipping")
+		} else {
+			log.Debugf("Starting DNS record management for host: " + dnsHost)
+			dnsKey := viper.GetString("dns.config.key")
+			if dnsKey == "" {
+				log.Debugf("DNS key not found !")
+				return
+			}
+
+			p := powerdns.NewPowerdns(dnsHost, dnsKey)
+			myCname := viper.GetStringSlice("dns.record.mycname")
+			for _, myCnameName := range myCname {
+				log.Debugf("Updating CNAME record: " + myCnameName)
+				err := p.UpdateRecord(domainName, "CNAME", myCnameName, hostFqdn+".", 86400)
+				if err != nil {
+					log.Debugf("Failed to update CNAME record !")
+				}
+			}
+			//dnsa := viper.GetStringSlice("dns.record.mycname")
+			//for _,v := range dnsa {
+			//    log.Debugf("DNS.MYCNAME:"+v)
+			//}
+			//dnsgen := viper.Get("dns.record.gen").([]interface{})
+			//for _,v := range dnsgen {
+			//    dnsrecord := v.(map[string]interface{})
+			//    content := dnsrecord["content"].(string)
+			//    rtype := dnsrecord["type"].(string)
+			//    log.Debugf("DNS.GEN: KEY:"+content+" VALUE:"+rtype)
+			//}
+		}
+
 		// Configure Puppet execution
 		puppetServer := viper.GetString("puppet.config.server")
 		var puppetParam []string

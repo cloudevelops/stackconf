@@ -24,6 +24,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/juju/loggo"
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
@@ -32,9 +33,9 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"time"
-	//"github.com/davecgh/go-spew/spew"
+	"strconv"
 	"strings"
+	"time"
 )
 
 var cfgFile string
@@ -222,7 +223,19 @@ func openstackMeta() (err error) {
 	}
 	for k, v := range mv {
 		if k != "metadata" {
-			metaData[k] = v
+			// Non string values have to be parsed for array and Unmarshaled to interface again to fix terrible Openstack dual escaping
+			vString := v.(string)
+			var vMJson interface{}
+			if vString[:1] == "[" {
+				vJson := `{"` + k + `":` + vString + `}`
+				err := json.Unmarshal([]byte(vJson), &vMJson)
+				if err != nil {
+					log.Debugf("Openstackmeta Array JSON Unmarshal failed")
+				}
+				metaData[k] = vMJson.(map[string]interface{})[k]
+			} else {
+				metaData[k] = vString
+			}
 		}
 	}
 	// Marshall metadata
@@ -247,4 +260,51 @@ func metaGetMerge(key string) (parameter map[string]string, err error) {
 		}
 	}
 	return
+}
+
+func unEscape(escaped string) (unescaped string) {
+
+	var escapedBytes []byte = []byte(escaped)
+	var resultString string
+	log.Debugf("Stringing bytes:")
+	for i := 1; i < 4; i++ {
+		newchar := string(escapedBytes[i])
+		index := strconv.Itoa(i)
+		log.Debugf("Index:" + index + ",Char:" + newchar)
+	}
+	if string(escapedBytes[1]) == "[" {
+		for i, char := range escapedBytes {
+			if i > 0 && i < len(escapedBytes) {
+				resultString = resultString + string(char)
+			}
+		}
+		unescaped = resultString
+		log.Debugf("Brackets are matched !")
+	} else {
+		unescaped = escaped
+	}
+	spew.Dump(escaped)
+	spew.Dump(unescaped)
+	//    var resultstring string
+	//    for i, char := range val {
+	//        index := strconv.Itoa(i)
+	//        value := string(char)
+	//        fmt.Println("Char:"+index+"Value:"+value)
+	//        resultstring = resultstring + value
+	//        //spew.Dump(char)
+	//    }
+	//    s, _ := strconv.Unquote(string(val))
+	//    spew.Dump(resultstring)
+	//    var err error
+	//    unescaped,err = strconv.Unquote(`"`+escaped+`"`)
+	//    if err != nil {
+	//        spew.Dump(unescaped)
+	//        log.Errorf("Failed to unquote: "+err.Error())
+	//    }
+	//  unattempt := strings.Replace(escaped, "\\", "", -1)
+	//    spew.Dump(unattempt)
+	//unescaped = strings.Replace(escaped,"\\","", -1)
+	//spew.Dump(escaped)
+	//spew.Dump(unescaped)
+	return unescaped
 }
