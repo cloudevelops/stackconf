@@ -21,17 +21,20 @@
 package cmd
 
 import (
-	//	"github.com/davecgh/go-spew/spew"
 	"encoding/json"
-	"github.com/cloudevelops/go-foreman"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"os/exec"
 	"strconv"
 	"strings"
+
+	//"github.com/davecgh/go-spew/spew"
+
+	"github.com/cloudevelops/go-foreman"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	//"bytes"
 	"bufio"
 	"fmt"
+
 	"github.com/cloudevelops/go-powerdns"
 )
 
@@ -98,7 +101,12 @@ var createCmd = &cobra.Command{
 		}
 
 		// Location
-		locationName := hostNameSplit[len(hostNameSplit)-1]
+		var locationName string
+		locationName = viper.GetString("foreman.host.location")
+		if locationName == "" {
+			log.Debugf("Location not found in config, trying to set from TLD")
+			locationName = hostNameSplit[len(hostNameSplit)-1]
+		}
 		location, err := f.SearchResource("locations", locationName)
 		var locationId string
 		if err == nil {
@@ -139,7 +147,13 @@ var createCmd = &cobra.Command{
 			return
 		}
 		// architecture
-		architectureName := viper.GetString("puppetfacter.os.hardware")
+		puppetVersion := viper.GetInt("puppet.version")
+		var architectureName string
+		if puppetVersion == 4 {
+			architectureName = viper.GetString("puppetfacter.os.hardware")
+		} else {
+			architectureName = viper.GetString("puppetfacter.hardwaremodel")
+		}
 		if architectureName == "" {
 			log.Debugf("Architecture not found !")
 			return
@@ -154,10 +168,19 @@ var createCmd = &cobra.Command{
 			return
 		}
 		// operatingsystem
-		osName := viper.GetString("puppetfacter.os.name")
+		var osName string
+		if puppetVersion == 4 {
+			osName = viper.GetString("puppetfacter.os.name")
+		} else {
+			osName = viper.GetString("puppetfacter.lsbdistid")
+		}
 		var operatingSystemName string
 		if osName == "Ubuntu" {
-			operatingSystemName = viper.GetString("puppetfacter.os.distro.description")
+			if puppetVersion == 4 {
+				operatingSystemName = viper.GetString("puppetfacter.os.distro.description")
+			} else {
+				operatingSystemName = viper.GetString("puppetfacter.lsbdistdescription")
+			}
 		} else {
 			operatingSystemName = viper.GetString("puppetfacter.os.distro.id") + " " + viper.GetString("puppetfacter.os.distro.release.full")
 		}
@@ -175,7 +198,12 @@ var createCmd = &cobra.Command{
 			return
 		}
 		// ipAddress
-		ipAddress := viper.GetString("puppetfacter.networking.ip")
+		var ipAddress string
+		if puppetVersion == 4 {
+			ipAddress = viper.GetString("puppetfacter.networking.ip")
+		} else {
+			ipAddress = viper.GetString("puppetfacter.ipaddress")
+		}
 		if ipAddress == "" {
 			log.Debugf("IP Address not found !")
 			return
@@ -183,7 +211,12 @@ var createCmd = &cobra.Command{
 			log.Debugf("IP Address: " + ipAddress)
 		}
 		// macAddress
-		macAddress := viper.GetString("puppetfacter.networking.mac")
+		var macAddress string
+		if puppetVersion == 4 {
+			macAddress = viper.GetString("puppetfacter.networking.mac")
+		} else {
+			macAddress = viper.GetString("puppetfacter.macaddress")
+		}
 		if macAddress == "" {
 			log.Debugf("Mac Address not found !")
 			return
@@ -300,7 +333,13 @@ var createCmd = &cobra.Command{
 		}
 		// Enable Puppet
 		log.Debugf("Enabling puppet")
-		puppetEnabler := exec.Command("/opt/puppetlabs/bin/puppet", "agent", "--enable")
+		var puppetExecutable string
+		if puppetVersion == 4 {
+			puppetExecutable = "/opt/puppetlabs/bin/puppet"
+		} else {
+			puppetExecutable = "/usr/bin/puppet"
+		}
+		puppetEnabler := exec.Command(puppetExecutable, "agent", "--enable")
 		c := make(chan struct{})
 		go runCommand(puppetEnabler, c)
 		c <- struct{}{}
@@ -316,7 +355,7 @@ var createCmd = &cobra.Command{
 			runCount := strconv.Itoa(r)
 			log.Debugf("Running puppet, run #" + runCount)
 			//spew.Dump(puppetParam)
-			cmd := exec.Command("/opt/puppetlabs/bin/puppet", puppetParam...)
+			cmd := exec.Command(puppetExecutable, puppetParam...)
 			c := make(chan struct{})
 			go runCommand(cmd, c)
 			c <- struct{}{}

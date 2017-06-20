@@ -24,11 +24,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/juju/loggo"
-	homedir "github.com/mitchellh/go-homedir"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -36,6 +31,12 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/juju/loggo"
+	homedir "github.com/mitchellh/go-homedir"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var cfgFile string
@@ -98,6 +99,11 @@ func initConfig() {
 	viper.SetDefault("stackconf.tools", "puppet")
 	viper.SetDefault("stackconf.sources", []string{"openstackmeta", "puppetfacter"})
 	viper.SetDefault("puppet.config.runs", 3)
+	if _, err := os.Stat("/opt/puppetlabs/bin/puppet"); err == nil {
+		viper.SetDefault("puppet.version", 4)
+	} else {
+		viper.SetDefault("puppet.version", 3)
+	}
 
 	viper.AutomaticEnv() // read in environment variables that match
 
@@ -138,7 +144,14 @@ func facter() (err error) {
 	}
 	var facterdata interface{}
 	// Run facter and output JSON
-	cmd := exec.Command("/opt/puppetlabs/bin/facter", "-j")
+	puppetVersion := viper.GetInt("puppet.version")
+	var facterExecutable string
+	if puppetVersion == 4 {
+		facterExecutable = "/opt/puppetlabs/bin/facter"
+	} else {
+		facterExecutable = "/usr/bin/facter"
+	}
+	cmd := exec.Command(facterExecutable, "-j")
 	var outb bytes.Buffer
 	cmd.Stdout = &outb
 	err = cmd.Run()
