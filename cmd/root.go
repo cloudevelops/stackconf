@@ -32,6 +32,9 @@ import (
 	"strings"
 	"time"
 
+	"html/template"
+
+	"github.com/Masterminds/sprig"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/juju/loggo"
 	homedir "github.com/mitchellh/go-homedir"
@@ -273,6 +276,16 @@ func metaGetMerge(key string) (parameter map[string]string, err error) {
 		}
 	}
 	return
+}
+
+func metaTemplate(text string) (parsed string, err error) {
+	t := template.Must(template.New("metaTemplate").Funcs(sprig.FuncMap()).Parse(text))
+	var tpl bytes.Buffer
+	err = t.Execute(&tpl, metaData)
+	if err != nil {
+		log.Debugf("Error during template execution" + err.Error())
+	}
+	return tpl.String(), err
 }
 
 func unEscape(escaped string) (unescaped string) {

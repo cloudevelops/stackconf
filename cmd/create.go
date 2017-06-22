@@ -301,6 +301,23 @@ var createCmd = &cobra.Command{
 					log.Debugf("Failed to update CNAME record !")
 				}
 			}
+			myPubCname := viper.GetStringSlice("dns.record.mypubcname")
+			for _, myPubCnameName := range myPubCname {
+				parsedPubCname, err := metaTemplate(myPubCnameName)
+				log.Debugf("Updating public CNAME record: " + parsedPubCname)
+				if err != nil {
+					log.Debugf("Failed to parse public CNAME !")
+				} else {
+					parsedPubCnameSplit := strings.Split(parsedPubCname, ".")
+					parsedPubCnameHostName := parsedPubCnameSplit[0]
+					parsedPubCnameDomainName := strings.Replace(parsedPubCname, parsedPubCnameHostName+".", "", -1)
+					err := p.UpdateRecord(parsedPubCnameDomainName, "CNAME", parsedPubCnameHostName, hostFqdn+".", 86400)
+					if err != nil {
+						log.Debugf("Failed to update CNAME record !")
+					}
+				}
+			}
+
 			//dnsa := viper.GetStringSlice("dns.record.mycname")
 			//for _,v := range dnsa {
 			//    log.Debugf("DNS.MYCNAME:"+v)
