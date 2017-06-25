@@ -38,6 +38,12 @@ import (
 	"github.com/cloudevelops/go-powerdns"
 )
 
+var p *powerdns.Powerdns
+
+var hostFqdn string
+var hostName string
+var domainName string
+
 // createCmd represents the create command
 var createCmd = &cobra.Command{
 	Use:   "create",
@@ -49,10 +55,10 @@ var createCmd = &cobra.Command{
 		//Foreman prototype
 		f := foreman.NewForeman(viper.GetString("foreman.config.host"), viper.GetString("foreman.config.username"), viper.GetString("foreman.config.password"))
 		// Host
-		hostFqdn := viper.GetString("openstackmeta.name")
+		hostFqdn = viper.GetString("openstackmeta.name")
 		hostNameSplit := strings.Split(hostFqdn, ".")
-		hostName := hostNameSplit[0]
-		domainName := strings.Replace(hostFqdn, hostName+".", "", -1)
+		hostName = hostNameSplit[0]
+		domainName = strings.Replace(hostFqdn, hostName+".", "", -1)
 		host, err := f.SearchResource("hosts", hostFqdn)
 		if err == nil {
 			log.Debugf("Host exists, deleting")
@@ -291,44 +297,16 @@ var createCmd = &cobra.Command{
 				log.Debugf("DNS key not found !")
 				return
 			}
+			// Inicialize powerdns
+			p = powerdns.NewPowerdns(dnsHost, dnsKey)
 
-			p := powerdns.NewPowerdns(dnsHost, dnsKey)
-			myCname := viper.GetStringSlice("dns.record.mycname")
-			for _, myCnameName := range myCname {
-				log.Debugf("Updating CNAME record: " + myCnameName)
-				err := p.UpdateRecord(domainName, "CNAME", myCnameName, hostFqdn+".", 86400)
-				if err != nil {
-					log.Debugf("Failed to update CNAME record !")
-				}
-			}
-			myPubCname := viper.GetStringSlice("dns.record.mypubcname")
-			for _, myPubCnameName := range myPubCname {
-				parsedPubCname, err := metaTemplate(myPubCnameName)
-				log.Debugf("Updating public CNAME record: " + parsedPubCname)
-				if err != nil {
-					log.Debugf("Failed to parse public CNAME !")
-				} else {
-					parsedPubCnameSplit := strings.Split(parsedPubCname, ".")
-					parsedPubCnameHostName := parsedPubCnameSplit[0]
-					parsedPubCnameDomainName := strings.Replace(parsedPubCname, parsedPubCnameHostName+".", "", -1)
-					err := p.UpdateRecord(parsedPubCnameDomainName, "CNAME", parsedPubCnameHostName, hostFqdn+".", 86400)
-					if err != nil {
-						log.Debugf("Failed to update CNAME record !")
-					}
-				}
-			}
+			// Lookup for config values and setup records
+			doMetaSliceMap("dns.record.a", dnsRecordMyA)
+			doMetaSliceMap("dns.record.mya", dnsRecordMyA)
+			doMetaSliceMap("dns.record.cname", dnsRecordCname)
+			doMetaSlice("dns.record.mycname", dnsRecordMyCname)
+			doMetaSlice("dns.record.mypubcname", dnsRecordMyPubCname)
 
-			//dnsa := viper.GetStringSlice("dns.record.mycname")
-			//for _,v := range dnsa {
-			//    log.Debugf("DNS.MYCNAME:"+v)
-			//}
-			//dnsgen := viper.Get("dns.record.gen").([]interface{})
-			//for _,v := range dnsgen {
-			//    dnsrecord := v.(map[string]interface{})
-			//    content := dnsrecord["content"].(string)
-			//    rtype := dnsrecord["type"].(string)
-			//    log.Debugf("DNS.GEN: KEY:"+content+" VALUE:"+rtype)
-			//}
 		}
 
 		// Configure Puppet execution
@@ -401,14 +379,159 @@ func runCommand(cmd *exec.Cmd, c chan struct{}) {
 
 func init() {
 	RootCmd.AddCommand(createCmd)
+}
 
-	// Here you will define your flags and configuration settings.
+func doMetaSliceMap(config string, f func(map[string]interface{})) {
+	for i := 0; i < 100; i++ {
+		var lookup string
+		if i == 0 {
+			lookup = config
+		} else {
+			lookupindex := strconv.Itoa(i)
+			lookup = config + lookupindex
+		}
+		iface := viper.Get(lookup)
+		if iface != nil {
+			islice, ok := iface.([]interface{})
+			if ok {
+				for _, islicev := range islice {
+					islicemap, ok := islicev.(map[string]interface{})
+					if ok {
+						f(islicemap)
+					} else {
+						log.Debugf("Array value in " + config + " is not a Hash !")
+					}
+				}
+			} else {
+				log.Debugf("Record " + config + " is not Array!")
+			}
+		}
+	}
+}
 
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// createCmd.PersistentFlags().String("foo", "", "A help for foo")
+func doMetaSlice(config string, f func(string)) {
+	for i := 0; i < 100; i++ {
+		var lookup string
+		if i == 0 {
+			lookup = config
+		} else {
+			lookupindex := strconv.Itoa(i)
+			lookup = config + lookupindex
+		}
+		iface := viper.Get(lookup)
+		if iface != nil {
+			islice, ok := iface.([]interface{})
+			if ok {
+				for _, islicev := range islice {
+					islicestring, ok := islicev.(string)
+					if ok {
+						f(islicestring)
+					} else {
+						log.Debugf("Array value in " + config + " is not a String !")
+					}
+				}
+			} else {
+				log.Debugf("Record " + config + " is not Array!")
+			}
+		}
+	}
+}
 
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// createCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+func dnsRecordMyA(hash map[string]interface{}) {
+	for k, v := range hash {
+		pK, err := metaTemplate(k)
+		if err != nil {
+			log.Debugf("Failed to parse dns.record.a key " + k + " !")
+			return
+		}
+		pV, err := metaTemplate(v.(string))
+		if err != nil {
+			log.Debugf("Failed to parse dns.record.a value " + v.(string) + " !")
+			return
+		}
+		err = p.UpdateRecord(domainName, "A", pK, pV, 60)
+		if err != nil {
+			log.Debugf("Failed to update A record, domain: " + domainName + ", content: " + pK + ", value: " + pV + " !")
+		}
+		log.Debugf("Updated A record, domain: " + domainName + ", content: " + pK + ", value: " + pV + " !")
+	}
+}
+
+func dnsRecordA(hash map[string]interface{}) {
+	for k, v := range hash {
+		pK, err := metaTemplate(k)
+		if err != nil {
+			log.Debugf("Failed to parse dns.record.a key " + k + " !")
+			return
+		}
+		pV, err := metaTemplate(v.(string))
+		if err != nil {
+			log.Debugf("Failed to parse dns.record.a value " + v.(string) + " !")
+			return
+		}
+
+		pKSplit := strings.Split(pK, ".")
+		pKHostName := pKSplit[0]
+		pKDomainName := strings.Replace(pK, pKHostName+".", "", -1)
+
+		err = p.UpdateRecord(pKDomainName, "A", pKHostName, pV, 60)
+		if err != nil {
+			log.Debugf("Failed to update A record, domain: " + pKDomainName + ", content: " + pKHostName + ", value: " + pV + " !")
+		}
+		log.Debugf("Updated A record, domain: " + pKDomainName + ", content: " + pKHostName + ", value: " + pV + " !")
+	}
+}
+
+func dnsRecordCname(hash map[string]interface{}) {
+	for k, v := range hash {
+		pK, err := metaTemplate(k)
+		if err != nil {
+			log.Debugf("Failed to parse dns.record.cname key " + k + " !")
+			return
+		}
+		pV, err := metaTemplate(v.(string))
+		if err != nil {
+			log.Debugf("Failed to parse dns.record.cname value " + v.(string) + " !")
+			return
+		}
+
+		pKSplit := strings.Split(pK, ".")
+		pKHostName := pKSplit[0]
+		pKDomainName := strings.Replace(pK, pKHostName+".", "", -1)
+
+		err = p.UpdateRecord(pKDomainName, "CNAME", pKHostName, pV+".", 60)
+		if err != nil {
+			log.Debugf("Failed to update CNAME record, domain: " + pKDomainName + ", content: " + pKHostName + ", value: " + pV + ". !")
+		}
+		log.Debugf("Updated CNAME record, domain: " + pKDomainName + ", content: " + pKHostName + ", value: " + pV + ". !")
+	}
+}
+
+func dnsRecordMyPubCname(s string) {
+	pS, err := metaTemplate(s)
+	if err != nil {
+		log.Debugf("Failed to parse dns.record.mypubcname value " + s + " !")
+		return
+	}
+	pSSplit := strings.Split(pS, ".")
+	pSHostName := pSSplit[0]
+	pSDomainName := strings.Replace(pS, pSHostName+".", "", -1)
+	err = p.UpdateRecord(pSDomainName, "CNAME", pSHostName, hostFqdn+".", 60)
+	if err != nil {
+		log.Debugf("Failed to update CNAME record, domain: " + pSDomainName + ", content: " + pSHostName + ", value: " + hostFqdn + ". !")
+	}
+	log.Debugf("Updated CNAME record, domain: " + pSDomainName + ", content: " + pSHostName + ", value: " + hostFqdn + ". !")
+}
+
+func dnsRecordMyCname(s string) {
+	pS, err := metaTemplate(s)
+	if err != nil {
+		log.Debugf("Failed to parse dns.record.mycname value " + s + " !")
+		return
+	}
+	err = p.UpdateRecord(domainName, "CNAME", pS, hostFqdn+".", 60)
+	if err != nil {
+		log.Debugf("Failed to update CNAME record, domain: " + domainName + ", content: " + pS + ", value: " + hostFqdn + ". !")
+	}
+	log.Debugf("Updated CNAME record, domain: " + domainName + ", content: " + pS + ", value: " + hostFqdn + ". !")
 }
