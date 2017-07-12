@@ -21,10 +21,13 @@
 package cmd
 
 import (
+	"database/sql"
 	"encoding/json"
 	"os/exec"
 	"strconv"
 	"strings"
+
+	_ "github.com/go-sql-driver/mysql"
 
 	//"github.com/davecgh/go-spew/spew"
 
@@ -39,7 +42,7 @@ import (
 )
 
 var p *powerdns.Powerdns
-
+var d *sql.DB
 var hostFqdn string
 var hostName string
 var domainName string
@@ -51,7 +54,6 @@ var createCmd = &cobra.Command{
 	Long:  `Create a new stackconf host.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		log.Debugf("Create command: starting")
-
 		//Foreman prototype
 		f := foreman.NewForeman(viper.GetString("foreman.config.host"), viper.GetString("foreman.config.username"), viper.GetString("foreman.config.password"))
 		// Host
@@ -308,6 +310,8 @@ var createCmd = &cobra.Command{
 			doMetaSlice("dns.record.mypubcname", dnsRecordMyPubCname)
 
 		}
+		// Configure SQL
+		doMetaSliceMap("mysql.record", mySqlRecord)
 
 		// Configure Puppet execution
 		puppetServer := viper.GetString("puppet.config.server")
@@ -534,4 +538,85 @@ func dnsRecordMyCname(s string) {
 		log.Debugf("Failed to update CNAME record, domain: " + domainName + ", content: " + pS + ", value: " + hostFqdn + ". !")
 	}
 	log.Debugf("Updated CNAME record, domain: " + domainName + ", content: " + pS + ", value: " + hostFqdn + ". !")
+}
+
+func mySqlRecord(hash map[string]interface{}) {
+	uri := hash["uri"].(string)
+	if len(uri) == 0 {
+		log.Errorf("URI empty in mysql.record !")
+		return
+	}
+	uriSplit := strings.Split(uri, ".")
+	db := uriSplit[0]
+	table := uriSplit[1]
+	dbHost := viper.GetString("mysql.db." + db + ".host")
+	if dbHost == "" {
+		log.Errorf("DB Host mysql.db." + db + ".host not found in config !")
+		return
+	}
+	dbUser := viper.GetString("mysql.db." + db + ".user")
+	if dbUser == "" {
+		log.Errorf("DB User mysql.db." + db + ".user not found in config !")
+		return
+	}
+	dbPassword := viper.GetString("mysql.db." + db + ".password")
+	if dbPassword == "" {
+		log.Errorf("DB Password mysql.db." + db + ".password not found in config !")
+		return
+	}
+	template := hash["template"].(string)
+	if len(template) == 0 {
+		log.Errorf("Template empty in mysql.record !")
+		return
+	}
+	data := viper.Get(template).(map[string]interface{})
+	if data == nil {
+		log.Errorf("Template data " + template + " not found in config !")
+		return
+	}
+	dataLength := len(data)
+	var values []interface{}
+	index := 1
+	var keys string
+	var questions string
+	var valuesString string
+	for k, v := range data {
+		vC := fmt.Sprintf("%v", v)
+		vS, err := metaTemplate(vC)
+		if err != nil {
+			log.Debugf("Failed to parse " + template + " value " + vC + " !")
+			return
+		}
+		var vSI interface{} = vS
+		values = append(values, vSI)
+		if index < dataLength {
+			keys = keys + k + ","
+			questions = questions + "?,"
+			valuesString = valuesString + vS + ","
+		} else {
+			keys = keys + k
+			questions = questions + "?"
+			valuesString = valuesString + vS
+		}
+		index++
+	}
+	// Create an sql.DB and check for errors
+	var err error
+	d, err = sql.Open("mysql", dbUser+":"+dbPassword+"@tcp("+dbHost+":3306)/"+db)
+	if err != nil {
+		log.Errorf("Database open failed: " + err.Error())
+		return
+	}
+	defer d.Close()
+	err = d.Ping()
+	if err != nil {
+		log.Errorf("Database connection failed: " + err.Error())
+		return
+	}
+	_, err = d.Exec("INSERT INTO "+table+" ("+keys+") VALUES("+questions+")", values...)
+	if err != nil {
+		log.Errorf("Error inserting record into database: " + err.Error())
+		return
+	}
+	log.Debugf("Sucessfully inserted SQL record into mysql database " + dbUser + ":<PASS DEDACTED>@tcp(" + dbHost + ":3306)/" + db + " : INSERT INTO " + table + " (" + keys + ") VALUES(" + valuesString + ")")
 }
