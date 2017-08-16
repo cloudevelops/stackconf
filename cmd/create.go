@@ -50,6 +50,7 @@ var d *sql.DB
 var hostFqdn string
 var hostName string
 var domainName string
+var ipAddress string
 var j *jenkins.Jenkins
 
 // createCmd represents the create command
@@ -211,7 +212,6 @@ var createCmd = &cobra.Command{
 			return
 		}
 		// ipAddress
-		var ipAddress string
 		if puppetVersion == 4 {
 			ipAddress = viper.GetString("puppetfacter.networking.ip")
 		} else {
@@ -249,6 +249,30 @@ var createCmd = &cobra.Command{
 		if err != nil {
 			log.Debugf("Did not find host parameters")
 		}
+		// basic dns must be handled before host creation due to foreman conflicts
+		// Configure DNS
+		dnsHost := viper.GetString("dns.config.host")
+		if dnsHost == "" {
+			log.Debugf("DNS host not configure, skipping")
+		} else {
+			log.Debugf("Starting DNS record management for host: " + dnsHost)
+			dnsKey := viper.GetString("dns.config.key")
+			if dnsKey == "" {
+				log.Debugf("DNS key not found !")
+				return
+			}
+			// Inicialize powerdns
+			p = powerdns.NewPowerdns(dnsHost, dnsKey)
+			dnsRecordHostA()
+			// Lookup for config values and setup records
+			doMetaSliceMap("dns.record.a", dnsRecordMyA)
+			doMetaSliceMap("dns.record.mya", dnsRecordMyA)
+			doMetaSliceMap("dns.record.cname", dnsRecordCname)
+			doMetaSlice("dns.record.mycname", dnsRecordMyCname)
+			doMetaSlice("dns.record.mypubcname", dnsRecordMyPubCname)
+
+		}
+
 		// create host
 		type HostResource struct {
 			HostGroupId         string              `json:"hostgroup_id"`
@@ -293,28 +317,6 @@ var createCmd = &cobra.Command{
 		hostId := strconv.FormatFloat(data["id"].(float64), 'f', 0, 64)
 		log.Debugf("Host created, id: " + hostId)
 
-		// Configure DNS
-		dnsHost := viper.GetString("dns.config.host")
-		if dnsHost == "" {
-			log.Debugf("DNS host not configure, skipping")
-		} else {
-			log.Debugf("Starting DNS record management for host: " + dnsHost)
-			dnsKey := viper.GetString("dns.config.key")
-			if dnsKey == "" {
-				log.Debugf("DNS key not found !")
-				return
-			}
-			// Inicialize powerdns
-			p = powerdns.NewPowerdns(dnsHost, dnsKey)
-
-			// Lookup for config values and setup records
-			doMetaSliceMap("dns.record.a", dnsRecordMyA)
-			doMetaSliceMap("dns.record.mya", dnsRecordMyA)
-			doMetaSliceMap("dns.record.cname", dnsRecordCname)
-			doMetaSlice("dns.record.mycname", dnsRecordMyCname)
-			doMetaSlice("dns.record.mypubcname", dnsRecordMyPubCname)
-
-		}
 		// Configure SQL
 		doMetaSliceMap("mysql.record", mySqlRecord)
 		// Configure Jenkins
@@ -459,6 +461,14 @@ func doMetaSlice(config string, f func(string)) {
 			}
 		}
 	}
+}
+
+func dnsRecordHostA() {
+	err := p.UpdateRecord(domainName, "A", hostName, ipAddress, 60)
+	if err != nil {
+		log.Debugf("Failed to update A record, domain: " + domainName + ", content: " + hostName + ", value: " + ipAddress + " !")
+	}
+	log.Debugf("Updated A record, domain: " + domainName + ", content: " + hostName + ", value: " + ipAddress + " !")
 }
 
 func dnsRecordMyA(hash map[string]interface{}) {

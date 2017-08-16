@@ -254,6 +254,28 @@ func openstackMeta() (err error) {
 			}
 		}
 	}
+	env := metaData["stackenv"]
+	if env != nil {
+		envStr, ok := env.(string)
+		if !ok {
+			log.Debugf("Did not get stackenv variable, will not set environment specific configuration")
+		} else {
+			envData := viper.Get("env." + envStr)
+			envMap, ok := envData.(map[string]interface{})
+			if !ok {
+				log.Debugf("Failed to read environment specific configuration")
+			} else {
+				if envData != nil {
+					for k, v := range envMap {
+						metaData[k] = v
+					}
+					log.Debugf("Loaded stackenv environment " + envStr)
+				} else {
+					log.Debugf("Stackenv variable set to " + envStr + " , but did not find environment specific configuration")
+				}
+			}
+		}
+	}
 	// Marshall metadata
 	hostmetadata, err := json.Marshal(metaData)
 	if err != nil {
