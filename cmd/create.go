@@ -23,15 +23,19 @@ package cmd
 import (
 	"database/sql"
 	"encoding/json"
+	"html"
+	"io/ioutil"
 	"os/exec"
 	"strconv"
 	"strings"
 
+	"github.com/davecgh/go-spew/spew"
 	_ "github.com/go-sql-driver/mysql"
 
 	//"github.com/davecgh/go-spew/spew"
 
 	"github.com/cloudevelops/go-foreman"
+	jenkins "github.com/cloudevelops/go-jenkins"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	//"bytes"
@@ -46,6 +50,7 @@ var d *sql.DB
 var hostFqdn string
 var hostName string
 var domainName string
+var j *jenkins.Jenkins
 
 // createCmd represents the create command
 var createCmd = &cobra.Command{
@@ -312,6 +317,8 @@ var createCmd = &cobra.Command{
 		}
 		// Configure SQL
 		doMetaSliceMap("mysql.record", mySqlRecord)
+		// Configure Jenkins
+		doMetaSliceMap("jenkins.job", jenkinsJob)
 
 		// Configure Puppet execution
 		puppetServer := viper.GetString("puppet.config.server")
@@ -324,7 +331,11 @@ var createCmd = &cobra.Command{
 				return
 			} else {
 				log.Debugf("Puppet will run in SRV mode in domain: " + puppetSrv)
-				puppetParam = []string{"agent", "-tv", "--use_srv_records", "--srv_domain", puppetSrv}
+				if puppetVersion == 4 {
+					puppetParam = []string{"agent", "-tv", "--use_srv_records", "--srv_domain", puppetSrv}
+				} else {
+					puppetParam = []string{"agent", "-tv", "--use_srv_records", "--srv_domain", puppetSrv, "--pluginsync", "--pluginsource", "puppet:///plugins"}
+				}
 			}
 		} else {
 			log.Debugf("Puppet will run in server mode with server: " + puppetServer)
@@ -373,11 +384,20 @@ func runCommand(cmd *exec.Cmd, c chan struct{}) {
 	if err != nil {
 		panic(err)
 	}
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		panic(err)
+	}
 	<-c
 	scanner := bufio.NewScanner(stdout)
 	for scanner.Scan() {
 		m := scanner.Text()
 		fmt.Println(m)
+	}
+	errScanner := bufio.NewScanner(stderr)
+	for errScanner.Scan() {
+		e := errScanner.Text()
+		fmt.Println(e)
 	}
 }
 
@@ -619,4 +639,84 @@ func mySqlRecord(hash map[string]interface{}) {
 		return
 	}
 	log.Debugf("Sucessfully inserted SQL record into mysql database " + dbUser + ":<PASS DEDACTED>@tcp(" + dbHost + ":3306)/" + db + " : INSERT INTO " + table + " (" + keys + ") VALUES(" + valuesString + ")")
+}
+
+func jenkinsJob(hash map[string]interface{}) {
+	uri := hash["uri"].(string)
+	if len(uri) == 0 {
+		log.Errorf("URI empty in jenkins.job !")
+		return
+	}
+	jenkinsHost := viper.GetString("jenkins.host." + uri + ".host")
+	if jenkinsHost == "" {
+		log.Errorf("Jenkins host jenkins.host." + uri + ".host not found in config !")
+		return
+	}
+	jenkinsUser := viper.GetString("jenkins.host." + uri + ".user")
+	if jenkinsUser == "" {
+		log.Errorf("Jenkins user jenkins.host." + uri + ".user not found in config !")
+		return
+	}
+	jenkinsPassword := viper.GetString("jenkins.host." + uri + ".password")
+	if jenkinsPassword == "" {
+		log.Errorf("Jenkins password jenkins.host." + uri + ".password not found in config !")
+		return
+	}
+	templateFile := hash["template"].(string)
+	if len(templateFile) == 0 {
+		log.Errorf("Template empty in jenkins.job !")
+		return
+	}
+	nameSource := hash["name"].(string)
+	if len(nameSource) == 0 {
+		log.Errorf("Name empty in jenkins.job !")
+		return
+	}
+	name, err := metaTemplate(nameSource)
+	if err != nil {
+		log.Debugf("Failed to parse name value " + nameSource + " !")
+		return
+	}
+	templateFileContent, err := ioutil.ReadFile(templateFile) // just pass the file name
+	if err != nil {
+		log.Debugf("Failed to open Jenkins template file: " + templateFile + " !")
+		return
+	}
+	templateStringContent := string(templateFileContent) // convert content to a 'string'
+	jobXml, err := metaTemplate(templateStringContent)
+	if err != nil {
+		log.Debugf("Failed to parse Jenkins template file " + templateFile + " with content: " + templateStringContent)
+		return
+	}
+	// Inicialize jenkins
+	j = jenkins.NewJenkins(jenkinsHost, jenkinsUser, jenkinsPassword)
+
+	//	jobXmlBytes := []byte(jobXml)
+	job := html.UnescapeString(jobXml)
+	projectName := html.EscapeString(name)
+	response, err := j.Post("createItem?name="+projectName, job)
+	if err != nil {
+		log.Errorf("Error creating host !")
+		return
+	}
+	spew.Dump(response)
+	// Create an sql.DB and check for errors
+	//	var err error
+	//	d, err = sql.Open("mysql", dbUser+":"+dbPassword+"@tcp("+dbHost+":3306)/"+db)
+	//	if err != nil {
+	//		log.Errorf("Database open failed: " + err.Error())
+	//		return
+	//	}
+	//	defer d.Close()
+	//	err = d.Ping()
+	//	if err != nil {
+	//		log.Errorf("Database connection failed: " + err.Error())
+	//		return
+	//	}
+	//	_, err = d.Exec("INSERT INTO "+table+" ("+keys+") VALUES("+questions+")", values...)
+	//	if err != nil {
+	//		log.Errorf("Error inserting record into database: " + err.Error())
+	//		return
+	//	}
+	//	log.Debugf("Sucessfully inserted SQL record into mysql database " + dbUser + ":<PASS DEDACTED>@tcp(" + dbHost + ":3306)/" + db + " : INSERT INTO " + table + " (" + keys + ") VALUES(" + valuesString + ")")
 }

@@ -241,8 +241,10 @@ func openstackMeta() (err error) {
 		if k != "metadata" {
 			// Non string values have to be parsed for array and Unmarshaled to interface again to fix terrible Openstack dual escaping
 			vString := v.(string)
+			spew.Dump(k)
+			spew.Dump(v)
 			var vMJson interface{}
-			if vString[:1] == "[" {
+			if len(vString) != 0 && vString[:1] == "[" {
 				vJson := `{"` + k + `":` + vString + `}`
 				err := json.Unmarshal([]byte(vJson), &vMJson)
 				if err != nil {
