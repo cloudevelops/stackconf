@@ -31,7 +31,6 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	_ "github.com/go-sql-driver/mysql"
-
 	//"github.com/davecgh/go-spew/spew"
 
 	"github.com/cloudevelops/go-foreman"
@@ -263,7 +262,7 @@ var createCmd = &cobra.Command{
 			}
 			// Inicialize powerdns
 			p = powerdns.NewPowerdns(dnsHost, dnsKey)
-			dnsRecordHostA()
+			dnsDeleteRecordHostA()
 			// Lookup for config values and setup records
 			doMetaSliceMap("dns.record.a", dnsRecordMyA)
 			doMetaSliceMap("dns.record.mya", dnsRecordMyA)
@@ -312,6 +311,7 @@ var createCmd = &cobra.Command{
 		data, err := f.Post("hosts", jsonText)
 		if err != nil {
 			log.Errorf("Error creating host !")
+			spew.Dump(data)
 			return
 		}
 		hostId := strconv.FormatFloat(data["id"].(float64), 'f', 0, 64)
@@ -469,6 +469,14 @@ func dnsRecordHostA() {
 		log.Debugf("Failed to update A record, domain: " + domainName + ", content: " + hostName + ", value: " + ipAddress + " !")
 	}
 	log.Debugf("Updated A record, domain: " + domainName + ", content: " + hostName + ", value: " + ipAddress + " !")
+}
+
+func dnsDeleteRecordHostA() {
+	err := p.DeleteRecord(domainName, "A", hostName)
+	if err != nil {
+		log.Debugf("Failed to delete A record, domain: " + domainName + ", content: " + hostName + " !")
+	}
+	log.Debugf("Deleted A record, domain: " + domainName + ", content: " + hostName + " !")
 }
 
 func dnsRecordMyA(hash map[string]interface{}) {

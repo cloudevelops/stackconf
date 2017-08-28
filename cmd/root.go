@@ -282,10 +282,16 @@ func openstackMeta() (err error) {
 		log.Debugf("Openstackmeta JSON prepend failed !")
 		return
 	}
+	// dump allsettings
+	//allsettings := viper.AllSettings()
+	//spew.Dump(allsettings)
 	// Load host metadata to config
 	viper.SetConfigType("json")
 	viper.MergeConfig(bytes.NewReader(hostmetadata))
 	log.Debugf("Host metadata from openstack loaded into config")
+	//allsettings = viper.AllSettings()
+	//spew.Dump(allsettings)
+
 	return
 }
 
