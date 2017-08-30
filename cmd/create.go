@@ -28,6 +28,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	_ "github.com/go-sql-driver/mysql"
@@ -263,6 +264,7 @@ var createCmd = &cobra.Command{
 			// Inicialize powerdns
 			p = powerdns.NewPowerdns(dnsHost, dnsKey)
 			dnsDeleteRecordHostA()
+			dnsRecordHostA()
 			// Lookup for config values and setup records
 			doMetaSliceMap("dns.record.a", dnsRecordMyA)
 			doMetaSliceMap("dns.record.mya", dnsRecordMyA)
@@ -310,9 +312,23 @@ var createCmd = &cobra.Command{
 		jsonText, err := json.Marshal(hostMap)
 		data, err := f.Post("hosts", jsonText)
 		if err != nil {
-			log.Errorf("Error creating host !")
-			spew.Dump(data)
-			return
+			log.Errorf("Error creating host, retrying in 5s !")
+			time.Sleep(5 * time.Second)
+			data, err = f.Post("hosts", jsonText)
+			if err != nil {
+				log.Errorf("Error creating host, retrying in 15s !")
+				time.Sleep(15 * time.Second)
+				data, err = f.Post("hosts", jsonText)
+				if err != nil {
+					log.Errorf("Error creating host, retrying in 60s !")
+					time.Sleep(60 * time.Second)
+					data, err = f.Post("hosts", jsonText)
+					if err != nil {
+						log.Errorf("Error creating host, giving up !")
+						return
+					}
+				}
+			}
 		}
 		hostId := strconv.FormatFloat(data["id"].(float64), 'f', 0, 64)
 		log.Debugf("Host created, id: " + hostId)
