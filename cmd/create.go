@@ -352,7 +352,7 @@ var createCmd = &cobra.Command{
 				if puppetVersion == 4 {
 					puppetParam = []string{"agent", "-tv", "--use_srv_records", "--srv_domain", puppetSrv}
 				} else {
-					puppetParam = []string{"agent", "-tv", "--use_srv_records", "--srv_domain", puppetSrv, "--pluginsync", "--pluginsource", "puppet:///plugins", "--configtimeout", "1200"}
+					puppetParam = []string{"agent", "-tv", "--use_srv_records", "--srv_domain", puppetSrv, "--pluginsync", "--pluginsource", "puppet:///plugins", "--pluginfactsource", "puppet:///pluginfacts", "--configtimeout", "1200"}
 				}
 			}
 		} else {
