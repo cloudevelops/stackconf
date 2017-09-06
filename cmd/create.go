@@ -63,7 +63,13 @@ var createCmd = &cobra.Command{
 		//Foreman prototype
 		f := foreman.NewForeman(viper.GetString("foreman.config.host"), viper.GetString("foreman.config.username"), viper.GetString("foreman.config.password"))
 		// Host
-		hostFqdn = viper.GetString("openstackmeta.name")
+		puppetVersion := viper.GetInt("puppet.version")
+		if puppetVersion == 4 {
+			hostFqdn = viper.GetString("puppetfacter.networking.fqdn")
+		} else {
+			hostFqdn = viper.GetString("puppetfacter.fqdn")
+		}
+		spew.Dump(hostFqdn)
 		hostNameSplit := strings.Split(hostFqdn, ".")
 		hostName = hostNameSplit[0]
 		domainName = strings.Replace(hostFqdn, hostName+".", "", -1)
@@ -161,7 +167,6 @@ var createCmd = &cobra.Command{
 			return
 		}
 		// architecture
-		puppetVersion := viper.GetInt("puppet.version")
 		var architectureName string
 		if puppetVersion == 4 {
 			architectureName = viper.GetString("puppetfacter.os.hardware")
