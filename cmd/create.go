@@ -431,6 +431,8 @@ func runCommand(cmd *exec.Cmd, c chan struct{}) {
 		fmt.Println(e)
 		if strings.Contains(e, "The certificate retrieved from the master does not match the agent") {
 			puppetSslError = true
+		} else {
+			puppetSslError = false
 		}
 	}
 }
