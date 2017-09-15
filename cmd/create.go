@@ -52,6 +52,8 @@ var hostName string
 var domainName string
 var ipAddress string
 var j *jenkins.Jenkins
+var puppetSslError bool
+var f *foreman.Foreman
 
 // createCmd represents the create command
 var createCmd = &cobra.Command{
@@ -61,7 +63,7 @@ var createCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		log.Debugf("Create command: starting")
 		//Foreman prototype
-		f := foreman.NewForeman(viper.GetString("foreman.config.host"), viper.GetString("foreman.config.username"), viper.GetString("foreman.config.password"))
+		f = foreman.NewForeman(viper.GetString("foreman.config.host"), viper.GetString("foreman.config.username"), viper.GetString("foreman.config.password"))
 		// Host
 		puppetVersion := viper.GetInt("puppet.version")
 		if puppetVersion == 4 {
@@ -69,18 +71,12 @@ var createCmd = &cobra.Command{
 		} else {
 			hostFqdn = viper.GetString("puppetfacter.fqdn")
 		}
-		spew.Dump(hostFqdn)
 		hostNameSplit := strings.Split(hostFqdn, ".")
 		hostName = hostNameSplit[0]
 		domainName = strings.Replace(hostFqdn, hostName+".", "", -1)
-		host, err := f.SearchResource("hosts", hostFqdn)
-		if err == nil {
-			log.Debugf("Host exists, deleting")
-			hostId := strconv.FormatFloat(host["id"].(float64), 'f', -1, 64)
-			err := f.DeleteHost(hostId)
-			if err != nil {
-				log.Debugf("Host deletion failed")
-			}
+		err := foremanDelete(hostFqdn)
+		if err != nil {
+			log.Debugf("Foreman failed to delete host !")
 		}
 		// Domain
 		domain, err := f.SearchResource("domains", domainName)
@@ -315,25 +311,10 @@ var createCmd = &cobra.Command{
 			Parameters:          parameters,
 		}
 		jsonText, err := json.Marshal(hostMap)
-		data, err := f.Post("hosts", jsonText)
+		data, err := foremanCreate(jsonText)
 		if err != nil {
-			log.Errorf("Error creating host, retrying in 5s !")
-			time.Sleep(5 * time.Second)
-			data, err = f.Post("hosts", jsonText)
-			if err != nil {
-				log.Errorf("Error creating host, retrying in 15s !")
-				time.Sleep(15 * time.Second)
-				data, err = f.Post("hosts", jsonText)
-				if err != nil {
-					log.Errorf("Error creating host, retrying in 60s !")
-					time.Sleep(60 * time.Second)
-					data, err = f.Post("hosts", jsonText)
-					if err != nil {
-						log.Errorf("Error creating host, giving up !")
-						return
-					}
-				}
-			}
+			log.Errorf("Failed to create host in foreman !")
+			return
 		}
 		hostId := strconv.FormatFloat(data["id"].(float64), 'f', 0, 64)
 		log.Debugf("Host created, id: " + hostId)
@@ -396,6 +377,33 @@ var createCmd = &cobra.Command{
 			<-c
 			if err := cmd.Wait(); err != nil {
 				log.Debugf("Error executing puppet !")
+				spew.Dump(err)
+				if puppetSslError {
+					log.Debugf("Puppet SSL Error detected !")
+					foremanDelete(hostFqdn)
+					data, err := foremanCreate(jsonText)
+					if err != nil {
+						log.Errorf("Failed to create host in foreman !")
+						return
+					}
+					hostId := strconv.FormatFloat(data["id"].(float64), 'f', 0, 64)
+					log.Debugf("Host created, id: " + hostId)
+					var puppetSsl string
+					if puppetVersion == 4 {
+						puppetSsl = "/etc/puppetlabs/puppet/ssl"
+					} else {
+						puppetSsl = "/var/lib/puppet/ssl"
+					}
+					puppetSslFix := exec.Command("rm", "-rf", puppetSsl)
+					s := make(chan struct{})
+					go runCommand(puppetSslFix, s)
+					s <- struct{}{}
+					puppetSslFix.Start()
+					<-s
+					if err := puppetSslFix.Wait(); err != nil {
+						log.Debugf("Error deleting Puppet SSL dir !")
+					}
+				}
 			}
 		}
 	},
@@ -421,6 +429,9 @@ func runCommand(cmd *exec.Cmd, c chan struct{}) {
 	for errScanner.Scan() {
 		e := errScanner.Text()
 		fmt.Println(e)
+		if strings.Contains(e, "The certificate retrieved from the master does not match the agent") {
+			puppetSslError = true
+		}
 	}
 }
 
@@ -758,4 +769,47 @@ func jenkinsJob(hash map[string]interface{}) {
 	//		return
 	//	}
 	//	log.Debugf("Sucessfully inserted SQL record into mysql database " + dbUser + ":<PASS DEDACTED>@tcp(" + dbHost + ":3306)/" + db + " : INSERT INTO " + table + " (" + keys + ") VALUES(" + valuesString + ")")
+}
+
+func foremanCreate(jsonText []byte) (map[string]interface{}, error) {
+	data, err := f.Post("hosts", jsonText)
+	if err != nil {
+		log.Errorf("Error creating host, retrying in 5s !")
+		time.Sleep(5 * time.Second)
+		data, err = f.Post("hosts", jsonText)
+		if err != nil {
+			log.Errorf("Error creating host, retrying in 15s !")
+			time.Sleep(15 * time.Second)
+			data, err = f.Post("hosts", jsonText)
+			if err != nil {
+				log.Errorf("Error creating host, retrying in 60s !")
+				time.Sleep(60 * time.Second)
+				data, err = f.Post("hosts", jsonText)
+				if err != nil {
+					log.Errorf("Error creating host, retrying in 120s !")
+					time.Sleep(120 * time.Second)
+					data, err = f.Post("hosts", jsonText)
+					if err != nil {
+						log.Errorf("Error creating host, giving up !")
+						return nil, err
+					}
+				}
+			}
+		}
+	}
+	return data, err
+}
+
+func foremanDelete(hostFqdn string) error {
+	host, err := f.SearchResource("hosts", hostFqdn)
+	if err == nil {
+		log.Debugf("Host exists, deleting")
+		hostId := strconv.FormatFloat(host["id"].(float64), 'f', -1, 64)
+		err := f.DeleteHost(hostId)
+		if err != nil {
+			log.Debugf("Host deletion failed")
+			return err
+		}
+	}
+	return err
 }
