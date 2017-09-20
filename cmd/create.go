@@ -410,6 +410,7 @@ var createCmd = &cobra.Command{
 }
 
 func runCommand(cmd *exec.Cmd, c chan struct{}) {
+	puppetSslError = false
 	defer func() { c <- struct{}{} }()
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -431,8 +432,7 @@ func runCommand(cmd *exec.Cmd, c chan struct{}) {
 		fmt.Println(e)
 		if strings.Contains(e, "The certificate retrieved from the master does not match the agent") {
 			puppetSslError = true
-		} else {
-			puppetSslError = false
+			log.Debugf("SSL Error:" + e)
 		}
 	}
 }
