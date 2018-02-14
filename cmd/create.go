@@ -785,17 +785,17 @@ func foremanCreate(jsonText []byte) (map[string]interface{}, error) {
 			data, err = f.Post("hosts", jsonText)
 			if err != nil {
 				log.Errorf("Error creating host, retrying in 60s !")
-				time.Sleep(60 * time.Second)
-				data, err = f.Post("hosts", jsonText)
-				if err != nil {
-					log.Errorf("Error creating host, retrying in 120s !")
-					time.Sleep(120 * time.Second)
+				for i := 1; i < 31; i++ {
+					time.Sleep(60 * time.Second)
 					data, err = f.Post("hosts", jsonText)
 					if err != nil {
-						log.Errorf("Error creating host, giving up !")
-						return nil, err
+						log.Errorf("Error creating host, retrying in 60s, cycle !")
+					} else {
+						return data, err
 					}
 				}
+				log.Errorf("Error creating host, giving up !")
+				return nil, err
 			}
 		}
 	}
@@ -809,7 +809,28 @@ func foremanDelete(hostFqdn string) error {
 		hostId := strconv.FormatFloat(host["id"].(float64), 'f', -1, 64)
 		err := f.DeleteHost(hostId)
 		if err != nil {
-			log.Debugf("Host deletion failed")
+			log.Errorf("Error deleting host, retrying in 5s !")
+			time.Sleep(5 * time.Second)
+			err := f.DeleteHost(hostId)
+			if err != nil {
+				log.Errorf("Error deleting host, retrying in 15s !")
+				time.Sleep(15 * time.Second)
+				err := f.DeleteHost(hostId)
+				if err != nil {
+					log.Errorf("Error deleting host, retrying in 60s !")
+					for i := 1; i < 31; i++ {
+						time.Sleep(60 * time.Second)
+						err := f.DeleteHost(hostId)
+						if err != nil {
+							log.Errorf("Error deleting host, retrying in 60s !")
+						} else {
+							return err
+						}
+					}
+					log.Errorf("Error deleting host, giving up !")
+					return err
+				}
+			}
 			return err
 		}
 	}
