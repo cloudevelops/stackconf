@@ -267,7 +267,7 @@ var createCmd = &cobra.Command{
 			dnsDeleteRecordHostA()
 			dnsRecordHostA()
 			// Lookup for config values and setup records
-			doMetaSliceMap("dns.record.a", dnsRecordMyA)
+			doMetaSliceMap("dns.record.a", dnsRecordA)
 			doMetaSliceMap("dns.record.mya", dnsRecordMyA)
 			doMetaSliceMap("dns.record.cname", dnsRecordCname)
 			doMetaSlice("dns.record.mycname", dnsRecordMyCname)
