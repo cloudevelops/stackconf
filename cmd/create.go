@@ -266,6 +266,7 @@ var createCmd = &cobra.Command{
 			p = powerdns.NewPowerdns(dnsHost, dnsKey)
 			dnsDeleteRecordHostA()
 			dnsRecordHostA()
+			dnsRecordHostPtr()
 			// Lookup for config values and setup records
 			doMetaSliceMap("dns.record.a", dnsRecordA)
 			doMetaSliceMap("dns.record.mya", dnsRecordMyA)
@@ -511,6 +512,17 @@ func dnsDeleteRecordHostA() {
 		log.Debugf("Failed to delete A record, domain: " + domainName + ", content: " + hostName + " !")
 	}
 	log.Debugf("Deleted A record, domain: " + domainName + ", content: " + hostName + " !")
+}
+
+func dnsRecordHostPtr() {
+	ipAddressSlice := strings.Split(ipAddress, ".")
+	ptrRecord := ipAddressSlice[3] + "." + ipAddressSlice[2] + "." + ipAddressSlice[1] + "." + ipAddressSlice[0] + ".in-addr.arpa."
+	ptrDomain := ipAddressSlice[2] + "." + ipAddressSlice[1] + "." + ipAddressSlice[0] + ".in-addr.arpa"
+	err := p.UpdateRec(ptrDomain, "PTR", ptrRecord, hostFqdn+".", 60)
+	if err != nil {
+		log.Debugf("Failed to update PTR record, domain: " + ptrDomain + ", content: " + ptrRecord + ", value: " + hostFqdn + " !")
+	}
+	log.Debugf("Updated PTR record, domain: " + ptrDomain + ", content: " + ptrRecord + ", value: " + hostFqdn + " !")
 }
 
 func dnsRecordMyA(hash map[string]interface{}) {
