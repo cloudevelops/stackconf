@@ -633,9 +633,14 @@ func mySqlRecord(hash map[string]interface{}) {
 	uriSplit := strings.Split(uri, ".")
 	db := uriSplit[0]
 	table := uriSplit[1]
-	dbHost := viper.GetString("mysql.db." + db + ".host")
-	if dbHost == "" {
+	dbHostRaw := viper.GetString("mysql.db." + db + ".host")
+	if dbHostRaw == "" {
 		log.Errorf("DB Host mysql.db." + db + ".host not found in config !")
+		return
+	}
+	dbHost, err := metaTemplate(dbHostRaw)
+	if err != nil {
+		log.Errorf("DB Host value " + dbHostRaw + "failed to be parsed !")
 		return
 	}
 	dbUser := viper.GetString("mysql.db." + db + ".user")
@@ -685,7 +690,7 @@ func mySqlRecord(hash map[string]interface{}) {
 		index++
 	}
 	// Create an sql.DB and check for errors
-	var err error
+	//var err error
 	d, err = sql.Open("mysql", dbUser+":"+dbPassword+"@tcp("+dbHost+":3306)/"+db)
 	if err != nil {
 		log.Errorf("Database open failed: " + err.Error())
