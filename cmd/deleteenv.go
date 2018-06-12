@@ -86,7 +86,8 @@ var deleteenvCmd = &cobra.Command{
 					return
 				}
 				// Inicialize powerdns
-				p = powerdns.NewPowerdns(dnsHost, dnsKey)
+				dnsNameservers := viper.GetStringSlice("dns.config.nameservers")
+				p = powerdns.NewPowerdns(dnsHost, dnsKey, dnsNameservers)
 				querydomain := env
 				domain, err := p.Get("zones/" + querydomain)
 				if err == nil {

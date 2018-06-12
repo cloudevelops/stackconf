@@ -85,8 +85,23 @@ var createCmd = &cobra.Command{
 			domainId = strconv.FormatFloat(domain["id"].(float64), 'f', -1, 64)
 			log.Debugf("Domain found, name: " + domainName + "; id: " + domainId)
 		} else {
-			log.Errorf("Domain !")
-			return
+			log.Debugf("Domain NOT found, attempting to create domain: " + domainName)
+			foremanDnsProxy := viper.GetString("foreman.dnsproxy")
+			foremanDnsProxyResult, err := f.SearchResource("smart_proxies", foremanDnsProxy)
+			if err == nil {
+				foremanDnsProxyId := strconv.FormatFloat(foremanDnsProxyResult["id"].(float64), 'f', -1, 64)
+				log.Debugf("Foreman smart proxy found, name: " + foremanDnsProxy + "; id: " + foremanDnsProxyId)
+				domainId, err = foremanCreateDomain(domainName, foremanDnsProxyId)
+				if err == nil {
+					log.Debugf("Foreman domain created, name: " + domainName + "; id: " + domainId)
+				} else {
+					log.Errorf("Foreman domain creation failed, name: " + domainName + ", aborting.")
+					return
+				}
+			} else {
+				log.Errorf("Foreman smart proxy not found, aborting. Proxy name: " + foremanDnsProxy)
+				return
+			}
 		}
 		//Hostgroup
 		hostGroupName := viper.GetString("foreman.host.hostgroup")
@@ -263,7 +278,8 @@ var createCmd = &cobra.Command{
 				return
 			}
 			// Inicialize powerdns
-			p = powerdns.NewPowerdns(dnsHost, dnsKey)
+			dnsNameservers := viper.GetStringSlice("dns.config.nameservers")
+			p = powerdns.NewPowerdns(dnsHost, dnsKey, dnsNameservers)
 			dnsDeleteRecordHostA()
 			dnsRecordHostA()
 			dnsRecordHostPtr()
@@ -852,4 +868,58 @@ func foremanDelete(hostFqdn string) error {
 		}
 	}
 	return err
+}
+
+func foremanCreateResource(jsonText []byte, resource string) (map[string]interface{}, error) {
+	data, err := f.Post(resource, jsonText)
+	if err != nil {
+		log.Errorf("Error creating resource: " + resource + ", retrying in 5s !")
+		time.Sleep(5 * time.Second)
+		data, err = f.Post(resource, jsonText)
+		if err != nil {
+			log.Errorf("Error creating resource: " + resource + ", retrying in 15s !")
+			time.Sleep(15 * time.Second)
+			data, err = f.Post(resource, jsonText)
+			if err != nil {
+				log.Errorf("Error creating resource: " + resource + ", retrying in 60s !")
+				for i := 1; i < 31; i++ {
+					time.Sleep(60 * time.Second)
+					data, err = f.Post(resource, jsonText)
+					if err != nil {
+						log.Errorf("Error creating resource: " + resource + ", retrying in 60s, cycle !")
+					} else {
+						return data, err
+					}
+				}
+				log.Errorf("Error creating resource: " + resource + ", giving up !")
+				return nil, err
+			}
+		}
+	}
+	return data, err
+}
+
+func foremanCreateDomain(domain string, foremanProxy string) (domain_id string, err error) {
+	// create domain
+	type DomainResource struct {
+		Name  string `json:"name"`
+		DnsId string `json:"dns_id"`
+	}
+	type DomainMap map[string]DomainResource
+
+	//var hostMap map[string]HostResource
+	domainMap := make(DomainMap)
+	domainMap["domain"] = DomainResource{
+		Name:  domain,
+		DnsId: foremanProxy,
+	}
+	jsonText, err := json.Marshal(domainMap)
+	data, err := foremanCreateResource(jsonText, "domains")
+	if err != nil {
+		log.Errorf("Failed to create domain in foreman !")
+		return "", err
+	}
+	domainId := strconv.FormatFloat(data["id"].(float64), 'f', 0, 64)
+	log.Debugf("Domain created, id: " + domainId)
+	return domainId, nil
 }
