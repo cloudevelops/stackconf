@@ -159,8 +159,7 @@ func facter() (err error) {
 	cmd.Stdout = &outb
 	err = cmd.Run()
 	if err != nil {
-		log.Debugf("Facter execution failed !")
-		return
+		log.Debugf("Facter execution failed. Trying to continue...")
 	}
 	// Unmarshall JSON into plain interface
 	err = json.Unmarshal(outb.Bytes(), &facterdata)
