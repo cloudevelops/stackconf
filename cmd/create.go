@@ -289,6 +289,7 @@ var createCmd = &cobra.Command{
 			doMetaSliceMap("dns.record.cname", dnsRecordCname)
 			doMetaSlice("dns.record.mycname", dnsRecordMyCname)
 			doMetaSlice("dns.record.mypubcname", dnsRecordMyPubCname)
+			doMetaSliceMap("dns.record.roota", dnsRecordRootA)
 
 		}
 
@@ -583,6 +584,32 @@ func dnsRecordA(hash map[string]interface{}) {
 			log.Debugf("Failed to update A record, domain: " + pKDomainName + ", content: " + pKHostName + ", value: " + pV + " !")
 		}
 		log.Debugf("Updated A record, domain: " + pKDomainName + ", content: " + pKHostName + ", value: " + pV + " !")
+	}
+}
+
+func dnsRecordRootA(hash map[string]interface{}) {
+	for k, v := range hash {
+		pK, err := metaTemplate(k)
+		if err != nil {
+			log.Debugf("Failed to parse dns.record.a key " + k + " !")
+			return
+		}
+		pV, err := metaTemplate(v.(string))
+		if err != nil {
+			log.Debugf("Failed to parse dns.record.a value " + v.(string) + " !")
+			return
+		}
+
+		//pKSplit := strings.Split(pK, ".")
+		//pKHostName := pKSplit[0]
+		//pKDomainName := strings.Replace(pK, pKHostName+".", "", -1)
+		pKDomainName := pK + "."
+		pKHostName := pK + "."
+		err = p.UpdateRec(pKDomainName, "A", pKHostName, pV, 60)
+		if err != nil {
+			log.Debugf("Failed to update Root A record, domain: " + pKDomainName + ", content: " + pKHostName + ", value: " + pV + " !")
+		}
+		log.Debugf("Updated Root A record, domain: " + pKDomainName + ", content: " + pKHostName + ", value: " + pV + " !")
 	}
 }
 
