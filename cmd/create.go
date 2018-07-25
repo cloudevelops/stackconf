@@ -66,6 +66,7 @@ var createCmd = &cobra.Command{
 		f = foreman.NewForeman(viper.GetString("foreman.config.host"), viper.GetString("foreman.config.username"), viper.GetString("foreman.config.password"))
 		// Host
 		puppetVersion := viper.GetInt("puppet.version")
+		spew.Dump(puppetVersion)
 		if puppetVersion == 4 {
 			hostFqdn = viper.GetString("puppetfacter.networking.fqdn")
 		} else {
@@ -229,7 +230,17 @@ var createCmd = &cobra.Command{
 		}
 		// ipAddress
 		if puppetVersion == 4 {
-			ipAddress = viper.GetString("puppetfacter.networking.ip")
+			iface := viper.GetString("facter.interface")
+			if iface != "" {
+				log.Debugf("Set custom interface to fetch ip from: " + iface)
+				ipAddress = viper.GetString("puppetfacter.networking.interfaces." + iface + ".ip")
+				if ipAddress == "" {
+					log.Debugf("Failed to fetch ip from: " + iface + ", defaulting to puppetfacter.networking.ip")
+					ipAddress = viper.GetString("puppetfacter.networking.ip")
+				}
+			} else {
+				ipAddress = viper.GetString("puppetfacter.networking.ip")
+			}
 		} else {
 			ipAddress = viper.GetString("puppetfacter.ipaddress")
 		}
@@ -264,6 +275,15 @@ var createCmd = &cobra.Command{
 		}
 		if err != nil {
 			log.Debugf("Did not find host parameters")
+		}
+		// look for tier specificly
+		tier := viper.GetString("foreman.host.parameter.tier")
+		if tier != "" {
+			tierMap := make(map[string]string)
+			tierMap["name"] = "tier"
+			tierMap["value"] = tier
+			parameters = append(parameters, tierMap)
+			log.Debugf("Set tier: " + tier)
 		}
 		// basic dns must be handled before host creation due to foreman conflicts
 		// Configure DNS
