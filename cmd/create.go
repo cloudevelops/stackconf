@@ -266,10 +266,14 @@ var createCmd = &cobra.Command{
 		// parameters
 		var parameters []map[string]string
 		var paramMap map[string]string
+		var tierset bool
 		metaparameters, err := metaGetMerge("foreman.host.parameter")
 		for metak, metav := range metaparameters {
 			paramMap = make(map[string]string)
 			paramMap["name"] = metak
+			if metak == "tier" {
+				tierset = true
+			}
 			paramMap["value"] = metav
 			parameters = append(parameters, paramMap)
 		}
@@ -282,7 +286,9 @@ var createCmd = &cobra.Command{
 			tierMap := make(map[string]string)
 			tierMap["name"] = "tier"
 			tierMap["value"] = tier
-			parameters = append(parameters, tierMap)
+			if !tierset {
+				parameters = append(parameters, tierMap)
+			}
 			log.Debugf("Set tier: " + tier)
 		}
 		// basic dns must be handled before host creation due to foreman conflicts
