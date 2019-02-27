@@ -542,9 +542,10 @@ func doMetaSlice(config string, f func(string)) {
 }
 
 func dnsRecordHostA() {
-	err := p.UpdateRecord(domainName, "A", hostName, ipAddress, 60)
+	err := p.UpdateRecord(domainName, "A", hostName, ipAddress, 10)
 	if err != nil {
 		log.Debugf("Failed to update A record, domain: " + domainName + ", content: " + hostName + ", value: " + ipAddress + " !")
+		return
 	}
 	log.Debugf("Updated A record, domain: " + domainName + ", content: " + hostName + ", value: " + ipAddress + " !")
 }
@@ -553,6 +554,7 @@ func dnsDeleteRecordHostA() {
 	err := p.DeleteRecord(domainName, "A", hostName)
 	if err != nil {
 		log.Debugf("Failed to delete A record, domain: " + domainName + ", content: " + hostName + " !")
+		return
 	}
 	log.Debugf("Deleted A record, domain: " + domainName + ", content: " + hostName + " !")
 }
@@ -561,9 +563,10 @@ func dnsRecordHostPtr() {
 	ipAddressSlice := strings.Split(ipAddress, ".")
 	ptrRecord := ipAddressSlice[3] + "." + ipAddressSlice[2] + "." + ipAddressSlice[1] + "." + ipAddressSlice[0] + ".in-addr.arpa."
 	ptrDomain := ipAddressSlice[2] + "." + ipAddressSlice[1] + "." + ipAddressSlice[0] + ".in-addr.arpa"
-	err := p.UpdateRec(ptrDomain, "PTR", ptrRecord, hostFqdn+".", 60)
+	err := p.UpdateRec(ptrDomain, "PTR", ptrRecord, hostFqdn+".", 10)
 	if err != nil {
 		log.Debugf("Failed to update PTR record, domain: " + ptrDomain + ", content: " + ptrRecord + ", value: " + hostFqdn + " !")
+		return
 	}
 	log.Debugf("Updated PTR record, domain: " + ptrDomain + ", content: " + ptrRecord + ", value: " + hostFqdn + " !")
 }
@@ -580,9 +583,10 @@ func dnsRecordMyA(hash map[string]interface{}) {
 			log.Debugf("Failed to parse dns.record.a value " + v.(string) + " !")
 			return
 		}
-		err = p.UpdateRecord(domainName, "A", pK, pV, 60)
+		err = p.UpdateRecord(domainName, "A", pK, pV, 10)
 		if err != nil {
 			log.Debugf("Failed to update A record, domain: " + domainName + ", content: " + pK + ", value: " + pV + " !")
+			return
 		}
 		log.Debugf("Updated A record, domain: " + domainName + ", content: " + pK + ", value: " + pV + " !")
 	}
@@ -605,9 +609,10 @@ func dnsRecordA(hash map[string]interface{}) {
 		pKHostName := pKSplit[0]
 		pKDomainName := strings.Replace(pK, pKHostName+".", "", -1)
 
-		err = p.UpdateRecord(pKDomainName, "A", pKHostName, pV, 60)
+		err = p.UpdateRecord(pKDomainName, "A", pKHostName, pV, 10)
 		if err != nil {
 			log.Debugf("Failed to update A record, domain: " + pKDomainName + ", content: " + pKHostName + ", value: " + pV + " !")
+			return
 		}
 		log.Debugf("Updated A record, domain: " + pKDomainName + ", content: " + pKHostName + ", value: " + pV + " !")
 	}
@@ -631,9 +636,10 @@ func dnsRecordRootA(hash map[string]interface{}) {
 		//pKDomainName := strings.Replace(pK, pKHostName+".", "", -1)
 		pKDomainName := pK + "."
 		pKHostName := pK + "."
-		err = p.UpdateRec(pKDomainName, "A", pKHostName, pV, 60)
+		err = p.UpdateRec(pKDomainName, "A", pKHostName, pV, 10)
 		if err != nil {
 			log.Debugf("Failed to update Root A record, domain: " + pKDomainName + ", content: " + pKHostName + ", value: " + pV + " !")
+			return
 		}
 		log.Debugf("Updated Root A record, domain: " + pKDomainName + ", content: " + pKHostName + ", value: " + pV + " !")
 	}
@@ -656,9 +662,10 @@ func dnsRecordCname(hash map[string]interface{}) {
 		pKHostName := pKSplit[0]
 		pKDomainName := strings.Replace(pK, pKHostName+".", "", -1)
 
-		err = p.UpdateRecord(pKDomainName, "CNAME", pKHostName, pV+".", 60)
+		err = p.UpdateRecord(pKDomainName, "CNAME", pKHostName, pV+".", 10)
 		if err != nil {
 			log.Debugf("Failed to update CNAME record, domain: " + pKDomainName + ", content: " + pKHostName + ", value: " + pV + ". !")
+			return
 		}
 		log.Debugf("Updated CNAME record, domain: " + pKDomainName + ", content: " + pKHostName + ", value: " + pV + ". !")
 	}
@@ -673,9 +680,10 @@ func dnsRecordMyPubCname(s string) {
 	pSSplit := strings.Split(pS, ".")
 	pSHostName := pSSplit[0]
 	pSDomainName := strings.Replace(pS, pSHostName+".", "", -1)
-	err = p.UpdateRecord(pSDomainName, "CNAME", pSHostName, hostFqdn+".", 60)
+	err = p.UpdateRecord(pSDomainName, "CNAME", pSHostName, hostFqdn+".", 10)
 	if err != nil {
 		log.Debugf("Failed to update CNAME record, domain: " + pSDomainName + ", content: " + pSHostName + ", value: " + hostFqdn + ". !")
+		return
 	}
 	log.Debugf("Updated CNAME record, domain: " + pSDomainName + ", content: " + pSHostName + ", value: " + hostFqdn + ". !")
 }
@@ -686,9 +694,10 @@ func dnsRecordMyCname(s string) {
 		log.Debugf("Failed to parse dns.record.mycname value " + s + " !")
 		return
 	}
-	err = p.UpdateRecord(domainName, "CNAME", pS, hostFqdn+".", 60)
+	err = p.UpdateRecord(domainName, "CNAME", pS, hostFqdn+".", 10)
 	if err != nil {
 		log.Debugf("Failed to update CNAME record, domain: " + domainName + ", content: " + pS + ", value: " + hostFqdn + ". !")
+		return
 	}
 	log.Debugf("Updated CNAME record, domain: " + domainName + ", content: " + pS + ", value: " + hostFqdn + ". !")
 }
