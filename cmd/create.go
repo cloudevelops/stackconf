@@ -898,7 +898,7 @@ func foremanCreate(jsonText []byte) (map[string]interface{}, error) {
 }
 
 func foremanDelete(hostFqdn string) error {
-	host, err := f.SearchResource("hosts", hostFqdn)
+	host, err := f.SearchResourceName("hosts", hostFqdn)
 	if err == nil {
 		log.Debugf("Host exists, deleting")
 		hostId := strconv.FormatFloat(host["id"].(float64), 'f', -1, 64)

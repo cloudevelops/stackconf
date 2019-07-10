@@ -27,10 +27,12 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"strconv"
+	"strings"
 	"time"
 )
 
 var fo *foreman.Foreman
+var whitelistarr []string
 
 // deleteenvCmd represents the deleteenv command
 var deleteenvCmd = &cobra.Command{
@@ -38,6 +40,13 @@ var deleteenvCmd = &cobra.Command{
 	Short: "Deletes environment",
 	Long:  `Deletes environment set by arguments. More environments supported, it will try to find all resources including any present environment string`,
 	Run: func(cmd *cobra.Command, args []string) {
+		if noop {
+			log.Infof("Dry run enabled with --noop: deleteenv will not perform any changes")
+		}
+		whitelistarr = strings.Split(whitelist, ",")
+		if len(whitelistarr) > 0 {
+			log.Infof("Whitelisting following hosts:" + whitelist)
+		}
 		if len(args) < 1 {
 			log.Debugf("deleteenv requires at least one environment name to delete")
 			return
@@ -45,6 +54,22 @@ var deleteenvCmd = &cobra.Command{
 		log.Debugf("Starting deleteenv")
 		//Foreman prototype
 		fo = foreman.NewForeman(viper.GetString("foreman.config.host"), viper.GetString("foreman.config.username"), viper.GetString("foreman.config.password"))
+		//Init DNS
+		dnsHost := viper.GetString("dns.config.host")
+		if dnsHost == "" {
+			log.Debugf("DNS host not configured, skipping")
+		} else {
+			log.Debugf("Starting DNS record management for host: " + dnsHost)
+			dnsKey := viper.GetString("dns.config.key")
+			if dnsKey == "" {
+				log.Debugf("DNS key not found !")
+				dnsHost = ""
+			} else {
+				// Inicialize powerdns
+				dnsNameservers := viper.GetStringSlice("dns.config.nameservers")
+				p = powerdns.NewPowerdns(dnsHost, dnsKey, dnsNameservers)
+			}
+		}
 		// Host
 		for _, env := range args {
 			//hostNameSplit := strings.Split(hostFqdn, ".")
@@ -57,7 +82,7 @@ var deleteenvCmd = &cobra.Command{
 					resultData := resultItem.(map[string]interface{})
 					//resultData := resultItem
 					hostName = resultData["name"].(string)
-					log.Debugf("Deleting host: " + hostName)
+					log.Debugf(noopMsg + "Deleting host: " + hostName)
 					//				if title, ok := resultData["title"]; ok {
 					//				if title == Query {
 					//				return resultData, err
@@ -69,25 +94,23 @@ var deleteenvCmd = &cobra.Command{
 					//			err := f.DeleteHost(hostId)
 					//			if err != nil {
 					//				log.Debugf("Host deletion failed")
-					err := foremanDel(hostName)
-					if err != nil {
-						log.Debugf("Foreman failed to delete host: " + hostName + " !")
+					whitelistCheck := checkWhitelist(hostName)
+					if !whitelistCheck {
+						if !noop {
+							err := foremanDel(hostName)
+							if err != nil {
+								log.Debugf("Foreman failed to delete host: " + hostName + " !")
+							}
+						}
+					} else {
+						log.Debugf("Whitelisted, NOT deleting host: " + hostName + " !")
 					}
 				}
 			}
-			dnsHost := viper.GetString("dns.config.host")
 			if dnsHost == "" {
-				log.Debugf("DNS host not configure, skipping")
+				log.Debugf("DNS host not configured, skipping")
 			} else {
 				log.Debugf("Starting DNS record management for host: " + dnsHost)
-				dnsKey := viper.GetString("dns.config.key")
-				if dnsKey == "" {
-					log.Debugf("DNS key not found !")
-					return
-				}
-				// Inicialize powerdns
-				dnsNameservers := viper.GetStringSlice("dns.config.nameservers")
-				p = powerdns.NewPowerdns(dnsHost, dnsKey, dnsNameservers)
 				querydomain := env
 				domain, err := p.Get("zones/" + querydomain)
 				if err == nil {
@@ -97,23 +120,38 @@ var deleteenvCmd = &cobra.Command{
 						rrdata := rrset.(map[string]interface{})
 						rrtype := rrdata["type"].(string)
 						rrname := rrdata["name"].(string)
+						whiterrname := rrname[:len(rrname)-1]
 						if rrtype == "A" {
-							err := p.DeleteRec(querydomain, rrtype, rrname)
-							if err != nil {
-								log.Debugf("Failed to delete " + rrtype + " record, domain: " + querydomain + ", name: " + rrname + " !")
+							whitelistCheck := checkWhitelist(whiterrname)
+							if !whitelistCheck {
+								log.Debugf(noopMsg + "Deleting " + rrtype + " record, domain: " + domainName + ", name: " + rrname + " !")
+								if !noop {
+									err := p.DeleteRec(querydomain, rrtype, rrname)
+									if err != nil {
+										log.Debugf("Failed to delete " + rrtype + " record, domain: " + querydomain + ", name: " + rrname + " !")
+									}
+									log.Debugf("Deleted " + rrtype + " record, domain: " + domainName + ", name: " + rrname + " !")
+								}
+							} else {
+								log.Debugf("Whitelisted, NOT deleting " + rrtype + " record, domain: " + domainName + ", name: " + rrname + " !")
 							}
-							log.Debugf("Deleted " + rrtype + " record, domain: " + domainName + ", name: " + rrname + " !")
 						}
 						if rrtype == "CNAME" {
-							err := p.DeleteRec(querydomain, rrtype, rrname)
-							if err != nil {
-								log.Debugf("Failed to delete " + rrtype + " record, domain: " + querydomain + ", name: " + rrname + " !")
+							whitelistCheck := checkWhitelist(whiterrname)
+							if !whitelistCheck {
+								log.Debugf(noopMsg + "Deleting " + rrtype + " record, domain: " + domainName + ", name: " + rrname + " !")
+								if !noop {
+									err := p.DeleteRec(querydomain, rrtype, rrname)
+									if err != nil {
+										log.Debugf("Failed to delete " + rrtype + " record, domain: " + querydomain + ", name: " + rrname + " !")
+									}
+									log.Debugf("Deleted " + rrtype + " record, domain: " + domainName + ", name: " + rrname + " !")
+								}
+							} else {
+								log.Debugf("Whitelisted, NOT deleting " + rrtype + " record, domain: " + domainName + ", name: " + rrname + " !")
 							}
-							log.Debugf("Deleted " + rrtype + " record, domain: " + domainName + ", name: " + rrname + " !")
 						}
 					}
-
-					//spew.Dump(domainMap)
 				}
 			}
 		}
@@ -167,4 +205,13 @@ func foremanDel(hostFqdn string) error {
 		}
 	}
 	return err
+}
+
+func checkWhitelist(host string) bool {
+	for _, whitelisted := range whitelistarr {
+		if strings.Contains(host, whitelisted) {
+			return true
+		}
+	}
+	return false
 }
