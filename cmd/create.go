@@ -66,7 +66,7 @@ var createCmd = &cobra.Command{
 		f = foreman.NewForeman(viper.GetString("foreman.config.host"), viper.GetString("foreman.config.username"), viper.GetString("foreman.config.password"))
 		// Host
 		puppetVersion := viper.GetInt("puppet.version")
-		spew.Dump(puppetVersion)
+		//spew.Dump(puppetVersion)
 		if puppetVersion == 4 {
 			hostFqdn = viper.GetString("puppetfacter.networking.fqdn")
 		} else {
@@ -408,6 +408,7 @@ var createCmd = &cobra.Command{
 		}
 		// Run Puppet
 		puppetRuns := viper.GetInt("puppet.config.runs")
+		puppetRunTimeout := viper.GetInt("puppet.config.runtimeout")
 		for r := 1; r <= puppetRuns; r++ {
 			// Run puppet
 			runCount := strconv.Itoa(r)
@@ -418,6 +419,12 @@ var createCmd = &cobra.Command{
 			go runCommand(cmd, c)
 			c <- struct{}{}
 			cmd.Start()
+			go func() {
+				log.Debugf("Puppet run timeout: " + strconv.Itoa(puppetRunTimeout) + "s")
+				time.Sleep(time.Duration(puppetRunTimeout) * time.Second)
+				log.Debugf("Puppet run timeout reached, killing puppet !")
+				cmd.Process.Kill()
+			}()
 			<-c
 			if err := cmd.Wait(); err != nil {
 				log.Debugf("Error executing puppet !")

@@ -109,6 +109,7 @@ func initConfig() {
 	viper.SetDefault("stackconf.tools", "puppet")
 	viper.SetDefault("stackconf.sources", []string{"openstackmeta", "puppetfacter"})
 	viper.SetDefault("puppet.config.runs", 3)
+	viper.SetDefault("puppet.config.runtimeout", 900)
 	if _, err := os.Stat("/opt/puppetlabs/bin/puppet"); err == nil {
 		viper.SetDefault("puppet.version", 4)
 	} else {
