@@ -43,7 +43,9 @@ var deleteenvCmd = &cobra.Command{
 		if noop {
 			log.Infof("Dry run enabled with --noop: deleteenv will not perform any changes")
 		}
-		whitelistarr = strings.Split(whitelist, ",")
+		if whitelist != "" {
+			whitelistarr = strings.Split(whitelist, ",")
+		}
 		if len(whitelistarr) > 0 {
 			log.Infof("Whitelisting following hosts:" + whitelist)
 		}
