@@ -61,7 +61,7 @@ var deleteenvCmd = &cobra.Command{
 		if dnsHost == "" {
 			log.Debugf("DNS host not configured, skipping")
 		} else {
-			log.Debugf("Starting DNS record management for host: " + dnsHost)
+			log.Debugf("Inicializing powerdns")
 			dnsKey := viper.GetString("dns.config.key")
 			if dnsKey == "" {
 				log.Debugf("DNS key not found !")
@@ -114,45 +114,77 @@ var deleteenvCmd = &cobra.Command{
 			} else {
 				log.Debugf("Starting DNS record management for host: " + dnsHost)
 				querydomain := env
-				domain, err := p.Get("zones/" + querydomain)
-				if err == nil {
-					domainMap := domain.(map[string]interface{})
-					rrsets := domainMap["rrsets"].([]interface{})
-					for _, rrset := range rrsets {
-						rrdata := rrset.(map[string]interface{})
-						rrtype := rrdata["type"].(string)
-						rrname := rrdata["name"].(string)
-						whiterrname := rrname[:len(rrname)-1]
-						if rrtype == "A" {
-							whitelistCheck := checkWhitelist(whiterrname)
-							if !whitelistCheck {
-								log.Debugf(noopMsg + "Deleting " + rrtype + " record, domain: " + domainName + ", name: " + rrname + " !")
-								if !noop {
-									err := p.DeleteRec(querydomain, rrtype, rrname)
-									if err != nil {
-										log.Debugf("Failed to delete " + rrtype + " record, domain: " + querydomain + ", name: " + rrname + " !")
+				if !deleteDomains {
+					log.Debugf("Domains not managed, clearing for host: " + dnsHost)
+					domain, err := p.Get("zones/" + querydomain)
+					if err == nil {
+						domainMap := domain.(map[string]interface{})
+						rrsets := domainMap["rrsets"].([]interface{})
+						for _, rrset := range rrsets {
+							rrdata := rrset.(map[string]interface{})
+							rrtype := rrdata["type"].(string)
+							rrname := rrdata["name"].(string)
+							whiterrname := rrname[:len(rrname)-1]
+							if rrtype == "A" {
+								whitelistCheck := checkWhitelist(whiterrname)
+								if !whitelistCheck {
+									log.Debugf(noopMsg + "Deleting " + rrtype + " record, domain: " + domainName + ", name: " + rrname + " !")
+									if !noop {
+										err := p.DeleteRec(querydomain, rrtype, rrname)
+										if err != nil {
+											log.Debugf("Failed to delete " + rrtype + " record, domain: " + querydomain + ", name: " + rrname + " !")
+										}
+										log.Debugf("Deleted " + rrtype + " record, domain: " + domainName + ", name: " + rrname + " !")
 									}
-									log.Debugf("Deleted " + rrtype + " record, domain: " + domainName + ", name: " + rrname + " !")
+								} else {
+									log.Debugf("Whitelisted, NOT deleting " + rrtype + " record, domain: " + domainName + ", name: " + rrname + " !")
 								}
-							} else {
-								log.Debugf("Whitelisted, NOT deleting " + rrtype + " record, domain: " + domainName + ", name: " + rrname + " !")
+							}
+							if rrtype == "CNAME" {
+								whitelistCheck := checkWhitelist(whiterrname)
+								if !whitelistCheck {
+									log.Debugf(noopMsg + "Deleting " + rrtype + " record, domain: " + domainName + ", name: " + rrname + " !")
+									if !noop {
+										err := p.DeleteRec(querydomain, rrtype, rrname)
+										if err != nil {
+											log.Debugf("Failed to delete " + rrtype + " record, domain: " + querydomain + ", name: " + rrname + " !")
+										}
+										log.Debugf("Deleted " + rrtype + " record, domain: " + domainName + ", name: " + rrname + " !")
+									}
+								} else {
+									log.Debugf("Whitelisted, NOT deleting " + rrtype + " record, domain: " + domainName + ", name: " + rrname + " !")
+								}
 							}
 						}
-						if rrtype == "CNAME" {
-							whitelistCheck := checkWhitelist(whiterrname)
-							if !whitelistCheck {
-								log.Debugf(noopMsg + "Deleting " + rrtype + " record, domain: " + domainName + ", name: " + rrname + " !")
-								if !noop {
-									err := p.DeleteRec(querydomain, rrtype, rrname)
-									if err != nil {
-										log.Debugf("Failed to delete " + rrtype + " record, domain: " + querydomain + ", name: " + rrname + " !")
+					}
+				} else {
+					log.Debugf("Domains managed, clearing all domains for match: " + env)
+					domains, err := p.Get("zones")
+					if err == nil {
+						domainsMap := domains.([]interface{})
+						for _, domainField := range domainsMap {
+							domainData := domainField.(map[string]interface{})
+							domainId := domainData["id"].(string)
+							domainName := domainId[:len(domainId)-1]
+							if strings.Contains(domainName, env) {
+								log.Debugf("Domain " + domainName + " matches environment " + env)
+								whitelistCheck := checkWhitelist(domainName)
+								if !whitelistCheck {
+									log.Debugf(noopMsg + "Deleting domain: " + domainName)
+									if !noop {
+										err := p.DeleteDomain(domainId)
+										if err != nil {
+											log.Debugf("Failed to delete domain: " + domainName + " !")
+										}
+										log.Debugf("Deleted domain: " + domainName + " !")
 									}
-									log.Debugf("Deleted " + rrtype + " record, domain: " + domainName + ", name: " + rrname + " !")
+								} else {
+									log.Debugf("Whitelisted, NOT deleting domain: " + domainName + " !")
 								}
-							} else {
-								log.Debugf("Whitelisted, NOT deleting " + rrtype + " record, domain: " + domainName + ", name: " + rrname + " !")
 							}
 						}
+					} else {
+						log.Errorf("Powerdns query failed, skipping !")
 					}
 				}
 			}
