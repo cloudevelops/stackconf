@@ -263,27 +263,40 @@ func openstackMeta() (err error) {
 			}
 		}
 	}
-	env := metaData["stackenv"]
-	if env != nil {
-		envStr, ok := env.(string)
-		if !ok {
-			log.Debugf("Did not get stackenv variable, will not set environment specific configuration")
-		} else {
-			envData := viper.Get("env." + envStr)
-			envMap, ok := envData.(map[string]interface{})
+	var envStr string
+	envStr = viper.GetString("stackenv")
+	if envStr != "" {
+		log.Debugf("Using stackenv environment defined in config file: " + envStr)
+	} else {
+		env := metaData["stackenv"]
+		if env != nil {
+			var ok bool
+			envStr, ok = env.(string)
 			if !ok {
-				log.Debugf("Failed to read environment specific configuration")
-			} else {
-				if envData != nil {
-					for k, v := range envMap {
-						metaData[k] = v
-					}
-					log.Debugf("Loaded stackenv environment " + envStr)
-				} else {
-					log.Debugf("Stackenv variable set to " + envStr + " , but did not find environment specific configuration")
+				log.Debugf("Failed to get stackenv variable from metadata")
+			}
+		} else {
+			log.Debugf("Metadata stackenv variable is not present")
+		}
+	}
+	if envStr != "" {
+		log.Debugf("Did get stackenv variable, will set environment specific configuration fore environment: " + envStr)
+		envData := viper.Get("env." + envStr)
+		envMap, ok := envData.(map[string]interface{})
+		if !ok {
+			log.Debugf("Failed to read environment specific configuration")
+		} else {
+			if envData != nil {
+				for k, v := range envMap {
+					metaData[k] = v
 				}
+				log.Debugf("Loaded stackenv environment " + envStr)
+			} else {
+				log.Debugf("Stackenv variable set to " + envStr + " , but did not find environment specific configuration")
 			}
 		}
+	} else {
+		log.Debugf("Did not get stackenv variable, will not set environment specific configuration")
 	}
 	// Marshall metadata
 	hostmetadata, err := json.Marshal(metaData)
