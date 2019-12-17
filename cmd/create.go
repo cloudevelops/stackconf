@@ -404,7 +404,7 @@ var createCmd = &cobra.Command{
 		puppetEnabler.Start()
 		<-c
 		if err := puppetEnabler.Wait(); err != nil {
-			log.Debugf("Error executing puppet !")
+			log.Debugf("Error enabling puppet !")
 		}
 		// Run Puppet
 		puppetRuns := viper.GetInt("puppet.config.runs")
@@ -427,8 +427,21 @@ var createCmd = &cobra.Command{
 			}()
 			<-c
 			if err := cmd.Wait(); err != nil {
-				log.Debugf("Error executing puppet !")
-				spew.Dump(err)
+				//log.Debugf("Error executing puppet !")
+				if exitError, ok := err.(*exec.ExitError); ok {
+					switch exitError.ExitCode() {
+					case 1:
+						log.Debugf("Puppet did not run and ended with error, code 1 !")
+					case 2:
+						log.Debugf("Puppet run succeeded, and some resources were changed, code 2 !")
+					case 4:
+						log.Debugf("Puppet run succeeded, and some resources failed, code 4 !")
+					case 6:
+						log.Debugf("Puppet run succeeded, and included both changes and failures, code 6 !")
+					default:
+						log.Debugf("Puppet ended up with unknown error, code " + strconv.Itoa(exitError.ExitCode()))
+					}
+				}
 				if puppetSslError {
 					log.Debugf("Puppet SSL Error detected !")
 					foremanDelete(hostFqdn)
@@ -455,6 +468,8 @@ var createCmd = &cobra.Command{
 						log.Debugf("Error deleting Puppet SSL dir !")
 					}
 				}
+			} else {
+				log.Debugf("Puppet run succeeded, no changes to system are required, code 0 !")
 			}
 		}
 	},
