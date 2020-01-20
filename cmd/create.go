@@ -23,15 +23,15 @@ package cmd
 import (
 	"database/sql"
 	"encoding/json"
+	"github.com/davecgh/go-spew/spew"
+	_ "github.com/go-sql-driver/mysql"
 	"html"
 	"io/ioutil"
+	//"math"
 	"os/exec"
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/davecgh/go-spew/spew"
-	_ "github.com/go-sql-driver/mysql"
 	//"github.com/davecgh/go-spew/spew"
 
 	"github.com/cloudevelops/go-foreman"
@@ -53,6 +53,7 @@ var domainName string
 var ipAddress string
 var j *jenkins.Jenkins
 var puppetSslError bool
+var puppetCaError bool
 var f *foreman.Foreman
 
 // createCmd represents the create command
@@ -62,6 +63,7 @@ var createCmd = &cobra.Command{
 	Long:  `Create a new stackconf host.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		log.Debugf("Create command: starting")
+		stackconfTimeStart := time.Now()
 		//Foreman prototype
 		f = foreman.NewForeman(viper.GetString("foreman.config.host"), viper.GetString("foreman.config.username"), viper.GetString("foreman.config.password"))
 		// Host
@@ -407,6 +409,7 @@ var createCmd = &cobra.Command{
 			log.Debugf("Error enabling puppet !")
 		}
 		// Run Puppet
+		var puppetRunTimeSlice []string
 		puppetRuns := viper.GetInt("puppet.config.runs")
 		puppetRunTimeout := viper.GetInt("puppet.config.runtimeout")
 		for r := 1; r <= puppetRuns; r++ {
@@ -419,6 +422,7 @@ var createCmd = &cobra.Command{
 			go runCommand(cmd, c)
 			c <- struct{}{}
 			cmd.Start()
+			puppetRunTimeStart := time.Now()
 			go func() {
 				log.Debugf("Puppet run timeout: " + strconv.Itoa(puppetRunTimeout) + "s")
 				time.Sleep(time.Duration(puppetRunTimeout) * time.Second)
@@ -468,15 +472,54 @@ var createCmd = &cobra.Command{
 						log.Debugf("Error deleting Puppet SSL dir !")
 					}
 				}
+				if puppetCaError {
+					log.Debugf("Puppet CA Error detected, sleeping 60s and retrying !")
+					time.Sleep(60 * time.Second)
+					r = r - 1
+				}
 			} else {
 				log.Debugf("Puppet run succeeded, no changes to system are required, code 0 !")
+				r = puppetRuns + 1
 			}
+			//puppetRunTime := "is_virtual"
+			puppetRunTimeStop := time.Now()
+			puppetRunTime := puppetRunTimeStop.Sub(puppetRunTimeStart)
+			puppetRunTimeSeconds := int(puppetRunTime.Seconds())
+			puppetRunTimeSlice = append(puppetRunTimeSlice, strconv.Itoa(puppetRunTimeSeconds))
+			//		stackconfParameters := make(map[string]string)
+			//			stackconfParameters["stackconf_runtime"] = "200"
+			//strconv.Itoa(puppetRunTime)
+			//		err := foremanUpdateParameters(hostFqdn, stackconfParameters)
+			//	if err != nil {
+			//	log.Debugf("Error inserting paremeters to foreman !")
+			//		}
 		}
+		stackconfTimeStop := time.Now()
+		stackconfTime := stackconfTimeStop.Sub(stackconfTimeStart)
+		stackconfParameters := make(map[string]string)
+		stackconfTimeSeconds := int(stackconfTime.Seconds())
+		stackconfParameters["stackconf_runtime"] = strconv.Itoa(stackconfTimeSeconds)
+		var stackconfTimeString string
+		for k, v := range puppetRunTimeSlice {
+			delimiter := ""
+			if len(puppetRunTimeSlice) != k+1 {
+				delimiter = ","
+			}
+			stackconfTimeString = stackconfTimeString + v + delimiter
+		}
+		stackconfParameters["stackconf_puppet_runtime"] = stackconfTimeString
+		//strconv.Itoa(puppetRunTime)
+		err = foremanUpdateParameters(hostFqdn, stackconfParameters)
+		if err != nil {
+			log.Debugf("Error inserting parameters to foreman !")
+		}
+		log.Debugf("Stackconf run completed sucessfully !")
 	},
 }
 
 func runCommand(cmd *exec.Cmd, c chan struct{}) {
 	puppetSslError = false
+	puppetCaError = false
 	defer func() { c <- struct{}{} }()
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -499,6 +542,10 @@ func runCommand(cmd *exec.Cmd, c chan struct{}) {
 		if strings.Contains(e, "The certificate retrieved from the master does not match the agent") {
 			puppetSslError = true
 			log.Debugf("SSL Error:" + e)
+		}
+		if strings.Contains(e, "sslv3 alert certificate") {
+			puppetCaError = true
+			log.Debugf("Puppet CA Error:" + e)
 		}
 	}
 }
@@ -1006,4 +1053,51 @@ func foremanCreateDomain(domain string, foremanProxy string) (domain_id string, 
 	domainId := strconv.FormatFloat(data["id"].(float64), 'f', 0, 64)
 	log.Debugf("Domain created, id: " + domainId)
 	return domainId, nil
+}
+
+func foremanUpdateParameters(host string, parameters map[string]string) (err error) {
+	type HostResource struct {
+		Parameters []map[string]string `json:"host_parameters_attributes"`
+	}
+	type HostMap map[string]HostResource
+
+	hostGet, err := f.Get("hosts/" + host)
+	if err == nil {
+		log.Debugf("Host exists, updating host parameters")
+		//hostId := strconv.FormatFloat(hostGet["id"].(float64), 'f', -1, 64)
+		hostParameters := make([]map[string]string, 0)
+		for _, v := range hostGet["parameters"].([]interface{}) {
+			subparams := v.(map[string]interface{})
+			newparam := make(map[string]string)
+			newparam["name"] = subparams["name"].(string)
+			newparam["value"] = subparams["value"].(string)
+			hostParameters = append(hostParameters, newparam)
+		}
+		for k, v := range parameters {
+			newparam := make(map[string]string)
+			newparam["name"] = k
+			newparam["value"] = v
+			hostParameters = append(hostParameters, newparam)
+		}
+
+		//var hostMap map[string]HostResource
+		hostMap := make(HostMap)
+		hostMap["host"] = HostResource{
+			Parameters: hostParameters,
+		}
+		jsonText, err := json.Marshal(hostMap)
+		data, err := f.Put("hosts/"+host, jsonText)
+		if err != nil {
+			log.Errorf("Failed to update host parameters in foreman !")
+			return err
+		}
+		hostId := strconv.FormatFloat(data["id"].(float64), 'f', 0, 64)
+		log.Debugf("Host parameters updated, host id: " + hostId)
+	}
+
+	//	err := f.DeleteHost(hostId)
+	//	if err != nil {
+	//		log.Errorf("Error deleting host, retrying in 5s !")
+	//		time.Sleep(5 * time.Second)
+	return nil
 }
