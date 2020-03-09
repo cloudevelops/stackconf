@@ -43,6 +43,7 @@ import (
 	"fmt"
 
 	"github.com/cloudevelops/go-powerdns"
+	"github.com/shirou/gopsutil/process"
 )
 
 var p *powerdns.Powerdns
@@ -416,6 +417,9 @@ var createCmd = &cobra.Command{
 			// Run puppet
 			runCount := strconv.Itoa(r)
 			log.Debugf("Running puppet, run #" + runCount)
+			if r != puppetRuns {
+				killPuppet()
+			}
 			//spew.Dump(puppetParam)
 			cmd := exec.Command(puppetExecutable, puppetParam...)
 			c := make(chan struct{})
@@ -1100,4 +1104,33 @@ func foremanUpdateParameters(host string, parameters map[string]string) (err err
 	//		log.Errorf("Error deleting host, retrying in 5s !")
 	//		time.Sleep(5 * time.Second)
 	return nil
+}
+
+func killPuppet() {
+	puppetVersion := viper.GetInt("puppet.version")
+	//spew.Dump(puppetVersion)
+	if puppetVersion == 4 {
+		hostFqdn = viper.GetString("puppetfacter.networking.fqdn")
+	} else {
+		hostFqdn = viper.GetString("puppetfacter.fqdn")
+	}
+	var processes []*process.Process
+	processes, _ = process.Processes()
+	//var process *process.Process
+	processcount := 0
+	for _, process := range processes {
+		processName, _ := process.Name()
+		processPid := process.Pid
+		pid := fmt.Sprint(processPid)
+		if processName == "puppet" {
+			processcount++
+		}
+		if processcount > 1 {
+			log.Debugf("Puppet agent detected applying configuration with pid " + pid + ", killing it !")
+			err := process.Kill()
+			if err != nil {
+				log.Debugf("Killing puppet agent failed !")
+			}
+		}
+	}
 }
