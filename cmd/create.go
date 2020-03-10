@@ -1123,14 +1123,12 @@ func killPuppet() {
 		processPid := process.Pid
 		pid := fmt.Sprint(processPid)
 		if processName == "puppet" {
-			processcount++
-		}
-		if processcount > 1 {
 			log.Debugf("Puppet agent detected applying configuration with pid " + pid + ", killing it !")
 			err := process.Kill()
 			if err != nil {
 				log.Debugf("Killing puppet agent failed !")
 			}
+			processcount++
 		}
 	}
 }
