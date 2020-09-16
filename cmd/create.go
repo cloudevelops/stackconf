@@ -414,77 +414,79 @@ var createCmd = &cobra.Command{
 		puppetRuns := viper.GetInt("puppet.config.runs")
 		puppetRunTimeout := viper.GetInt("puppet.config.runtimeout")
 		for r := 1; r <= puppetRuns; r++ {
-			// Run puppet
 			runCount := strconv.Itoa(r)
 			log.Debugf("Running puppet, run #" + runCount)
-			if r != puppetRuns {
-				killPuppet()
-			}
-			//spew.Dump(puppetParam)
+
 			cmd := exec.Command(puppetExecutable, puppetParam...)
 			c := make(chan struct{})
-			go runCommand(cmd, c)
+			go runCommand(cmd, c) // Read output
 			c <- struct{}{}
+
 			cmd.Start()
 			puppetRunTimeStart := time.Now()
-			go func() {
-				log.Debugf("Puppet run timeout: " + strconv.Itoa(puppetRunTimeout) + "s")
-				time.Sleep(time.Duration(puppetRunTimeout) * time.Second)
+			log.Debugf("Puppet run timeout: " + strconv.Itoa(puppetRunTimeout) + "s")
+
+			c1 := make(chan error)
+			go func() {	c1 <- cmd.Wait() }()
+
+			select {
+			case <-time.After(time.Duration(puppetRunTimeout) * time.Second):
 				log.Debugf("Puppet run timeout reached, killing puppet !")
 				cmd.Process.Kill()
-			}()
-			<-c
-			if err := cmd.Wait(); err != nil {
-				//log.Debugf("Error executing puppet !")
-				if exitError, ok := err.(*exec.ExitError); ok {
-					switch exitError.ExitCode() {
-					case 1:
-						log.Debugf("Puppet did not run and ended with error, code 1 !")
-					case 2:
-						log.Debugf("Puppet run succeeded, and some resources were changed, code 2 !")
-					case 4:
-						log.Debugf("Puppet run succeeded, and some resources failed, code 4 !")
-					case 6:
-						log.Debugf("Puppet run succeeded, and included both changes and failures, code 6 !")
-					default:
-						log.Debugf("Puppet ended up with unknown error, code " + strconv.Itoa(exitError.ExitCode()))
+				killPuppet()
+			case res := <-c1:
+				if res != nil {
+					if exitError, ok := err.(*exec.ExitError); ok {
+						switch exitError.ExitCode() {
+						case 1:
+							log.Debugf("Puppet did not run and ended with error, code 1 !")
+						case 2:
+							log.Debugf("Puppet run succeeded, and some resources were changed, code 2 !")
+						case 4:
+							log.Debugf("Puppet run succeeded, and some resources failed, code 4 !")
+						case 6:
+							log.Debugf("Puppet run succeeded, and included both changes and failures, code 6 !")
+						default:
+							log.Debugf("Puppet ended up with unknown error, code " + strconv.Itoa(exitError.ExitCode()))
+						}
 					}
+					if puppetSslError {
+						log.Debugf("Puppet SSL Error detected !")
+						foremanDelete(hostFqdn)
+						data, err := foremanCreate(jsonText)
+						if err != nil {
+							log.Errorf("Failed to create host in foreman !")
+							return
+						}
+						hostId := strconv.FormatFloat(data["id"].(float64), 'f', 0, 64)
+						log.Debugf("Host created, id: " + hostId)
+						var puppetSsl string
+						if puppetVersion == 4 {
+							puppetSsl = "/etc/puppetlabs/puppet/ssl"
+						} else {
+							puppetSsl = "/var/lib/puppet/ssl"
+						}
+						puppetSslFix := exec.Command("rm", "-rf", puppetSsl)
+						s := make(chan struct{})
+						go runCommand(puppetSslFix, s)
+						s <- struct{}{}
+						puppetSslFix.Start()
+						<-s
+						if err := puppetSslFix.Wait(); err != nil {
+							log.Debugf("Error deleting Puppet SSL dir !")
+						}
+					}
+					if puppetCaError {
+						log.Debugf("Puppet CA Error detected, sleeping 60s and retrying !")
+						time.Sleep(60 * time.Second)
+						r = r - 1
+					}
+				} else {
+					log.Debugf("Puppet run succeeded, no changes to system are required, code 0 !")
+					r = puppetRuns + 1
 				}
-				if puppetSslError {
-					log.Debugf("Puppet SSL Error detected !")
-					foremanDelete(hostFqdn)
-					data, err := foremanCreate(jsonText)
-					if err != nil {
-						log.Errorf("Failed to create host in foreman !")
-						return
-					}
-					hostId := strconv.FormatFloat(data["id"].(float64), 'f', 0, 64)
-					log.Debugf("Host created, id: " + hostId)
-					var puppetSsl string
-					if puppetVersion == 4 {
-						puppetSsl = "/etc/puppetlabs/puppet/ssl"
-					} else {
-						puppetSsl = "/var/lib/puppet/ssl"
-					}
-					puppetSslFix := exec.Command("rm", "-rf", puppetSsl)
-					s := make(chan struct{})
-					go runCommand(puppetSslFix, s)
-					s <- struct{}{}
-					puppetSslFix.Start()
-					<-s
-					if err := puppetSslFix.Wait(); err != nil {
-						log.Debugf("Error deleting Puppet SSL dir !")
-					}
-				}
-				if puppetCaError {
-					log.Debugf("Puppet CA Error detected, sleeping 60s and retrying !")
-					time.Sleep(60 * time.Second)
-					r = r - 1
-				}
-			} else {
-				log.Debugf("Puppet run succeeded, no changes to system are required, code 0 !")
-				r = puppetRuns + 1
 			}
+
 			//puppetRunTime := "is_virtual"
 			puppetRunTimeStop := time.Now()
 			puppetRunTime := puppetRunTimeStop.Sub(puppetRunTimeStart)
