@@ -553,6 +553,10 @@ func runCommand(cmd *exec.Cmd, c chan struct{}) {
 			puppetCaError = true
 			log.Debugf("Puppet CA Error:" + e)
 		}
+		if strings.Contains(e, "puppet-ca/v1/certificate/ca timed out after") {
+			puppetCaError = true
+			log.Debugf("Puppet CA Error:" + e)
+		}
 	}
 }
 
