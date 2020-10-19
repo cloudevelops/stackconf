@@ -23,24 +23,24 @@ package cmd
 import (
 	"database/sql"
 	"encoding/json"
-	"github.com/davecgh/go-spew/spew"
+	//"github.com/davecgh/go-spew/spew" - not used
 	_ "github.com/go-sql-driver/mysql"
-	"html"
-	"io/ioutil"
-	//"math"
+	//"html" - not used
+	//"io/ioutil" - not used
+	//"math" - not used
 	"os/exec"
 	"strconv"
 	"strings"
 	"time"
-	//"github.com/davecgh/go-spew/spew"
 
 	"github.com/cloudevelops/go-foreman"
-	jenkins "github.com/cloudevelops/go-jenkins"
+	//jenkins "github.com/cloudevelops/go-jenkins" - doesn't exist
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	//"bytes"
+	//"bytes" - not used
 	"bufio"
 	"fmt"
+	"math/rand"
 
 	"github.com/cloudevelops/go-powerdns"
 	"github.com/shirou/gopsutil/process"
@@ -52,10 +52,11 @@ var hostFqdn string
 var hostName string
 var domainName string
 var ipAddress string
-var j *jenkins.Jenkins
+//var j *jenkins.Jenkins
 var puppetSslError bool
 var puppetCaError bool
 var f *foreman.Foreman
+var puppetCaRetries = 10
 
 // createCmd represents the create command
 var createCmd = &cobra.Command{
@@ -63,7 +64,8 @@ var createCmd = &cobra.Command{
 	Short: "Create a new stackconf host",
 	Long:  `Create a new stackconf host.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		log.Debugf("Create command: starting")
+		log.Debugf("Create command: starting, version 0.1.17")
+
 		stackconfTimeStart := time.Now()
 		//Foreman prototype
 		f = foreman.NewForeman(viper.GetString("foreman.config.host"), viper.GetString("foreman.config.username"), viper.GetString("foreman.config.password"))
@@ -369,7 +371,7 @@ var createCmd = &cobra.Command{
 		// Configure SQL
 		doMetaSliceMap("mysql.record", mySqlRecord)
 		// Configure Jenkins
-		doMetaSliceMap("jenkins.job", jenkinsJob)
+		//doMetaSliceMap("jenkins.job", jenkinsJob)
 
 		// Configure Puppet execution
 		puppetServer := viper.GetString("puppet.config.server")
@@ -413,6 +415,7 @@ var createCmd = &cobra.Command{
 		var puppetRunTimeSlice []string
 		puppetRuns := viper.GetInt("puppet.config.runs")
 		puppetRunTimeout := viper.GetInt("puppet.config.runtimeout")
+
 		for r := 1; r <= puppetRuns; r++ {
 			runCount := strconv.Itoa(r)
 			log.Debugf("Running puppet, run #" + runCount)
@@ -477,9 +480,10 @@ var createCmd = &cobra.Command{
 						}
 					}
 					if puppetCaError {
+						randomTime := rand.Intn(180 - 60 + 1) + 60
 						log.Debugf("Puppet CA Error detected, sleeping 60s and retrying !")
-						time.Sleep(60 * time.Second)
-						r = r - 1
+						time.Sleep(time.Duration(randomTime) * time.Second)
+						puppetRuns++
 					}
 				} else {
 					log.Debugf("Puppet run succeeded, no changes to system are required, code 0 !")
@@ -539,23 +543,26 @@ func runCommand(cmd *exec.Cmd, c chan struct{}) {
 	scanner := bufio.NewScanner(stdout)
 	for scanner.Scan() {
 		m := scanner.Text()
-		fmt.Println(m)
+		fmt.Println("STDOUT:", m)
 	}
+
 	errScanner := bufio.NewScanner(stderr)
 	for errScanner.Scan() {
 		e := errScanner.Text()
-		fmt.Println(e)
+		fmt.Println("STDERR:", e)
+
 		if strings.Contains(e, "The certificate retrieved from the master does not match the agent") {
 			puppetSslError = true
 			log.Debugf("SSL Error:" + e)
 		}
-		if strings.Contains(e, "sslv3 alert certificate") {
+
+		if (strings.Contains(e, "sslv3 alert certificate") ||
+		   strings.Contains(e, "puppet-ca/v1/certificate/ca timed out") ||
+		   strings.Contains(e, "Could not request certificate:")) &&
+		   puppetCaRetries > 0 {
 			puppetCaError = true
 			log.Debugf("Puppet CA Error:" + e)
-		}
-		if strings.Contains(e, "puppet-ca/v1/certificate/ca timed out after") {
-			puppetCaError = true
-			log.Debugf("Puppet CA Error:" + e)
+			puppetCaRetries--
 		}
 	}
 }
@@ -866,7 +873,7 @@ func mySqlRecord(hash map[string]interface{}) {
 	}
 	log.Debugf("Sucessfully inserted SQL record into mysql database " + dbUser + ":<PASS DEDACTED>@tcp(" + dbHost + ":3306)/" + db + " : INSERT INTO " + table + " (" + keys + ") VALUES(" + valuesString + ")")
 }
-
+/*
 func jenkinsJob(hash map[string]interface{}) {
 	uri := hash["uri"].(string)
 	if len(uri) == 0 {
@@ -945,7 +952,7 @@ func jenkinsJob(hash map[string]interface{}) {
 	//		return
 	//	}
 	//	log.Debugf("Sucessfully inserted SQL record into mysql database " + dbUser + ":<PASS DEDACTED>@tcp(" + dbHost + ":3306)/" + db + " : INSERT INTO " + table + " (" + keys + ") VALUES(" + valuesString + ")")
-}
+}*/
 
 func foremanCreate(jsonText []byte) (map[string]interface{}, error) {
 	data, err := f.Post("hosts", jsonText)

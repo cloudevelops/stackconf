@@ -57,5 +57,5 @@ scp /tmp/stackconf...deb apt.cloudevelops.com:/tmp/
 ## on apt.cloudevelops.com, execute install oneliner to deploy stackconf
 
 ```
-STACKCONF=/tmp/stackconf_0.1.10_amd64.deb; aptly repo add cloudevelops-xenial $STACKCONF; aptly repo add cloudevelops-stretch $STACKCONF; aptly repo add cloudevelops-trusty $STACKCONF; aptly repo add cloudevelops-bionic $STACKCONF; aptly repo add cloudevelops-jessie $STACKCONF; aptly publish update xenial cloudevelops && aptly publish update jessie cloudevelops && aptly publish update trusty cloudevelops && aptly publish update bionic cloudevelops && aptly publish update stretch cloudevelops
+STACKCONF=/tmp/stackconf_0.1.10_amd64.deb; aptly repo add cloudevelops-xenial $STACKCONF; aptly repo add cloudevelops-stretch $STACKCONF; aptly repo add cloudevelops-trusty $STACKCONF; aptly repo add cloudevelops-bionic $STACKCONF; aptly repo add cloudevelops-jessie $STACKCONF; aptly publish update xenial cloudevelops && aptly publish update jessie cloudevelops && aptly publish update trusty cloudevelops && aptly publish update bionic cloudevelops && aptly publish update stretch cloudevelops && aptly repo add cloudevelops-buster $STACKCONF && aptly publish update buster cloudevelops
 ```
