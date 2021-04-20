@@ -64,7 +64,7 @@ var createCmd = &cobra.Command{
 	Short: "Create a new stackconf host",
 	Long:  `Create a new stackconf host.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		log.Debugf("Create command: starting, version 0.1.17")
+		log.Debugf("Create command: starting, version 0.1.19")
 
 		stackconfTimeStart := time.Now()
 		//Foreman prototype
@@ -416,6 +416,8 @@ var createCmd = &cobra.Command{
 		puppetRuns := viper.GetInt("puppet.config.runs")
 		puppetRunTimeout := viper.GetInt("puppet.config.runtimeout")
 
+		log.Debugf("Puppet run timeout: " + strconv.Itoa(puppetRunTimeout) + "s, Puppet runs: " + strconv.Itoa(puppetRuns))
+
 		for r := 1; r <= puppetRuns; r++ {
 			runCount := strconv.Itoa(r)
 			log.Debugf("Running puppet, run #" + runCount)
@@ -427,7 +429,6 @@ var createCmd = &cobra.Command{
 
 			cmd.Start()
 			puppetRunTimeStart := time.Now()
-			log.Debugf("Puppet run timeout: " + strconv.Itoa(puppetRunTimeout) + "s")
 
 			c1 := make(chan error)
 			go func() {	c1 <- cmd.Wait() }()

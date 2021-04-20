@@ -124,6 +124,7 @@ func initConfig() {
 	if err := viper.ReadInConfig(); err == nil {
 		log.Debugf("Using config file: " + viper.ConfigFileUsed())
 	}
+
 	// Detect and load Facter source
 	if isInArray("puppetfacter", viper.GetStringSlice("stackconf.sources")) {
 		log.Debugf("Facter enabled: starting")
@@ -228,6 +229,7 @@ func openstackMeta() (err error) {
 	// Load Openstack metadata into Viper
 	viper.SetConfigType("json")
 	viper.MergeConfig(bytes.NewReader(metamash))
+
 	log.Debugf("Openstack metadata loaded into config, instance name: " + viper.GetString("openstackmeta.name"))
 	// Iterate through raw Opentack metadata and extract host and environment metadata
 	for k, v := range m {
@@ -298,6 +300,7 @@ func openstackMeta() (err error) {
 	} else {
 		log.Debugf("Did not get stackenv variable, will not set environment specific configuration")
 	}
+
 	// Marshall metadata
 	hostmetadata, err := json.Marshal(metaData)
 	if err != nil {
@@ -307,10 +310,17 @@ func openstackMeta() (err error) {
 	// dump allsettings
 	//allsettings := viper.AllSettings()
 	//spew.Dump(allsettings)
+
 	// Load host metadata to config
 	viper.SetConfigType("json")
 	viper.MergeConfig(bytes.NewReader(hostmetadata))
 	log.Debugf("Host metadata from openstack loaded into config")
+
+	// Fix puppet runs
+	if value, ok := metaData["puppet.config.runs"]; ok {
+		viper.Set("puppet.config.runs", value)
+	}
+
 	//allsettings = viper.AllSettings()
 	//spew.Dump(allsettings)
 
