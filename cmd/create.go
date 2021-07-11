@@ -65,7 +65,9 @@ var createCmd = &cobra.Command{
 	Long:  `Create a new stackconf host.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		log.Debugf("Create command: starting, version 0.1.19")
-
+		if noop {
+			log.Debugf("NOOP ENABLED! This create run will not do any changes.")
+		}
 		stackconfTimeStart := time.Now()
 		//Foreman prototype
 		f = foreman.NewForeman(viper.GetString("foreman.config.host"), viper.GetString("foreman.config.username"), viper.GetString("foreman.config.password"))
@@ -80,35 +82,7 @@ var createCmd = &cobra.Command{
 		hostNameSplit := strings.Split(hostFqdn, ".")
 		hostName = hostNameSplit[0]
 		domainName = strings.Replace(hostFqdn, hostName+".", "", -1)
-		err := foremanDelete(hostFqdn)
-		if err != nil {
-			log.Debugf("Foreman failed to delete host !")
-		}
-		// Domain
-		domain, err := f.SearchResource("domains", domainName)
-		var domainId string
-		if err == nil {
-			domainId = strconv.FormatFloat(domain["id"].(float64), 'f', -1, 64)
-			log.Debugf("Domain found, name: " + domainName + "; id: " + domainId)
-		} else {
-			log.Debugf("Domain NOT found, attempting to create domain: " + domainName)
-			foremanDnsProxy := viper.GetString("foreman.dnsproxy")
-			foremanDnsProxyResult, err := f.SearchResource("smart_proxies", foremanDnsProxy)
-			if err == nil {
-				foremanDnsProxyId := strconv.FormatFloat(foremanDnsProxyResult["id"].(float64), 'f', -1, 64)
-				log.Debugf("Foreman smart proxy found, name: " + foremanDnsProxy + "; id: " + foremanDnsProxyId)
-				domainId, err = foremanCreateDomain(domainName, foremanDnsProxyId)
-				if err == nil {
-					log.Debugf("Foreman domain created, name: " + domainName + "; id: " + domainId)
-				} else {
-					log.Errorf("Foreman domain creation failed, name: " + domainName + ", aborting.")
-					return
-				}
-			} else {
-				log.Errorf("Foreman smart proxy not found, aborting. Proxy name: " + foremanDnsProxy)
-				return
-			}
-		}
+
 		//Hostgroup
 		hostGroupName := viper.GetString("foreman.host.hostgroup")
 		if hostGroupName == "" {
@@ -296,32 +270,74 @@ var createCmd = &cobra.Command{
 			}
 			log.Debugf("Set tier: " + tier)
 		}
-		// basic dns must be handled before host creation due to foreman conflicts
-		// Configure DNS
-		dnsHost := viper.GetString("dns.config.host")
-		if dnsHost == "" {
-			log.Debugf("DNS host not configure, skipping")
+
+		if onlyDNS {
+			log.Debugf("Only DNS will be managed on this run.")
+
+			// basic dns must be handled before host creation due to foreman conflicts
+			// Configure DNS
+			dnsHost := viper.GetString("dns.config.host")
+			if dnsHost == "" {
+				log.Debugf("DNS host not configure, skipping")
+			} else {
+				log.Debugf("Starting DNS record management for host: " + dnsHost)
+				dnsKey := viper.GetString("dns.config.key")
+				if dnsKey == "" {
+					log.Debugf("DNS key not found !")
+					return
+				}
+
+				// Initialize powerdns
+				dnsNameservers := viper.GetStringSlice("dns.config.nameservers")
+				p = powerdns.NewPowerdns(dnsHost, dnsKey, dnsNameservers)
+				dnsDeleteRecordHostA()
+				dnsRecordHostA()
+				dnsRecordHostPtr()
+				// Lookup for config values and setup records
+				doMetaSliceMap("dns.record.a", dnsRecordA)
+				doMetaSliceMap("dns.record.mya", dnsRecordMyA)
+				doMetaSliceMap("dns.record.cname", dnsRecordCname)
+				doMetaSlice("dns.record.mycname", dnsRecordMyCname)
+				doMetaSlice("dns.record.mypubcname", dnsRecordMyPubCname)
+				doMetaSliceMap("dns.record.roota", dnsRecordRootA)
+			}
+
+			return
+		}
+
+		if !noop {
+			err = foremanDelete(hostFqdn)
+			if err != nil {
+				log.Debugf("Foreman failed to delete host !")
+			}
+		}
+		log.Debugf("Deleted host " + hostFqdn)
+
+		// Domain
+		domain, err := f.SearchResource("domains", domainName)
+		var domainId string
+		if err == nil {
+			domainId = strconv.FormatFloat(domain["id"].(float64), 'f', -1, 64)
+			log.Debugf("Domain found, name: " + domainName + "; id: " + domainId)
 		} else {
-			log.Debugf("Starting DNS record management for host: " + dnsHost)
-			dnsKey := viper.GetString("dns.config.key")
-			if dnsKey == "" {
-				log.Debugf("DNS key not found !")
+			log.Debugf("Domain NOT found, attempting to create domain: " + domainName)
+			foremanDnsProxy := viper.GetString("foreman.dnsproxy")
+			foremanDnsProxyResult, err := f.SearchResource("smart_proxies", foremanDnsProxy)
+			if err == nil {
+				foremanDnsProxyId := strconv.FormatFloat(foremanDnsProxyResult["id"].(float64), 'f', -1, 64)
+				log.Debugf("Foreman smart proxy found, name: " + foremanDnsProxy + "; id: " + foremanDnsProxyId)
+				if !noop {
+					domainId, err = foremanCreateDomain(domainName, foremanDnsProxyId)
+					if err != nil {
+						log.Errorf("Foreman domain creation failed, name: " + domainName + ", aborting.")
+						return
+					}
+				}
+				log.Debugf("Foreman domain created, name: " + domainName + "; id: " + domainId)
+			} else {
+				log.Errorf("Foreman smart proxy not found, aborting. Proxy name: " + foremanDnsProxy)
 				return
 			}
-			// Inicialize powerdns
-			dnsNameservers := viper.GetStringSlice("dns.config.nameservers")
-			p = powerdns.NewPowerdns(dnsHost, dnsKey, dnsNameservers)
-			dnsDeleteRecordHostA()
-			dnsRecordHostA()
-			dnsRecordHostPtr()
-			// Lookup for config values and setup records
-			doMetaSliceMap("dns.record.a", dnsRecordA)
-			doMetaSliceMap("dns.record.mya", dnsRecordMyA)
-			doMetaSliceMap("dns.record.cname", dnsRecordCname)
-			doMetaSlice("dns.record.mycname", dnsRecordMyCname)
-			doMetaSlice("dns.record.mypubcname", dnsRecordMyPubCname)
-			doMetaSliceMap("dns.record.roota", dnsRecordRootA)
-
 		}
 
 		// create host
@@ -360,13 +376,16 @@ var createCmd = &cobra.Command{
 			Parameters:          parameters,
 		}
 		jsonText, err := json.Marshal(hostMap)
-		data, err := foremanCreate(jsonText)
-		if err != nil {
-			log.Errorf("Failed to create host in foreman !")
-			return
+		if !noop {
+			data, err := foremanCreate(jsonText)
+			if err != nil {
+				log.Errorf("Failed to create host in foreman !")
+				return
+			}
+			hostId := strconv.FormatFloat(data["id"].(float64), 'f', 0, 64)
+			log.Debugf("Host created, id: " + hostId)
 		}
-		hostId := strconv.FormatFloat(data["id"].(float64), 'f', 0, 64)
-		log.Debugf("Host created, id: " + hostId)
+		log.Debugf("Host created (a sample, non-existing, noop host")
 
 		// Configure SQL
 		doMetaSliceMap("mysql.record", mySqlRecord)
@@ -402,128 +421,134 @@ var createCmd = &cobra.Command{
 		} else {
 			puppetExecutable = "/usr/bin/puppet"
 		}
-		puppetEnabler := exec.Command(puppetExecutable, "agent", "--enable")
-		c := make(chan struct{})
-		go runCommand(puppetEnabler, c)
-		c <- struct{}{}
-		puppetEnabler.Start()
-		<-c
-		if err := puppetEnabler.Wait(); err != nil {
-			log.Debugf("Error enabling puppet !")
-		}
-		// Run Puppet
-		var puppetRunTimeSlice []string
-		puppetRuns := viper.GetInt("puppet.config.runs")
-		puppetRunTimeout := viper.GetInt("puppet.config.runtimeout")
 
-		log.Debugf("Puppet run timeout: " + strconv.Itoa(puppetRunTimeout) + "s, Puppet runs: " + strconv.Itoa(puppetRuns))
-
-		for r := 1; r <= puppetRuns; r++ {
-			runCount := strconv.Itoa(r)
-			log.Debugf("Running puppet, run #" + runCount)
-
-			cmd := exec.Command(puppetExecutable, puppetParam...)
+		stackconfParameters := make(map[string]string)
+		if !noop {
+			puppetEnabler := exec.Command(puppetExecutable, "agent", "--enable")
 			c := make(chan struct{})
-			go runCommand(cmd, c) // Read output
+			go runCommand(puppetEnabler, c)
 			c <- struct{}{}
-
-			cmd.Start()
-			puppetRunTimeStart := time.Now()
-
-			c1 := make(chan error)
-			go func() {	c1 <- cmd.Wait() }()
-
-			select {
-			case <-time.After(time.Duration(puppetRunTimeout) * time.Second):
-				log.Debugf("Puppet run timeout reached, killing puppet !")
-				cmd.Process.Kill()
-				killPuppet()
-			case res := <-c1:
-				if res != nil {
-					if exitError, ok := err.(*exec.ExitError); ok {
-						switch exitError.ExitCode() {
-						case 1:
-							log.Debugf("Puppet did not run and ended with error, code 1 !")
-						case 2:
-							log.Debugf("Puppet run succeeded, and some resources were changed, code 2 !")
-						case 4:
-							log.Debugf("Puppet run succeeded, and some resources failed, code 4 !")
-						case 6:
-							log.Debugf("Puppet run succeeded, and included both changes and failures, code 6 !")
-						default:
-							log.Debugf("Puppet ended up with unknown error, code " + strconv.Itoa(exitError.ExitCode()))
-						}
-					}
-					if puppetSslError {
-						log.Debugf("Puppet SSL Error detected !")
-						foremanDelete(hostFqdn)
-						data, err := foremanCreate(jsonText)
-						if err != nil {
-							log.Errorf("Failed to create host in foreman !")
-							return
-						}
-						hostId := strconv.FormatFloat(data["id"].(float64), 'f', 0, 64)
-						log.Debugf("Host created, id: " + hostId)
-						var puppetSsl string
-						if puppetVersion == 4 {
-							puppetSsl = "/etc/puppetlabs/puppet/ssl"
-						} else {
-							puppetSsl = "/var/lib/puppet/ssl"
-						}
-						puppetSslFix := exec.Command("rm", "-rf", puppetSsl)
-						s := make(chan struct{})
-						go runCommand(puppetSslFix, s)
-						s <- struct{}{}
-						puppetSslFix.Start()
-						<-s
-						if err := puppetSslFix.Wait(); err != nil {
-							log.Debugf("Error deleting Puppet SSL dir !")
-						}
-					}
-					if puppetCaError {
-						randomTime := rand.Intn(180 - 60 + 1) + 60
-						log.Debugf("Puppet CA Error detected, sleeping 60s and retrying !")
-						time.Sleep(time.Duration(randomTime) * time.Second)
-						puppetRuns++
-					}
-				} else {
-					log.Debugf("Puppet run succeeded, no changes to system are required, code 0 !")
-					r = puppetRuns + 1
-				}
+			puppetEnabler.Start()
+			<-c
+			if err := puppetEnabler.Wait(); err != nil {
+				log.Debugf("Error enabling puppet !")
 			}
+			// Run Puppet
+			var puppetRunTimeSlice []string
+			puppetRuns := viper.GetInt("puppet.config.runs")
+			puppetRunTimeout := viper.GetInt("puppet.config.runtimeout")
 
-			//puppetRunTime := "is_virtual"
-			puppetRunTimeStop := time.Now()
-			puppetRunTime := puppetRunTimeStop.Sub(puppetRunTimeStart)
-			puppetRunTimeSeconds := int(puppetRunTime.Seconds())
-			puppetRunTimeSlice = append(puppetRunTimeSlice, strconv.Itoa(puppetRunTimeSeconds))
-			//		stackconfParameters := make(map[string]string)
-			//			stackconfParameters["stackconf_runtime"] = "200"
+			log.Debugf("Puppet run timeout: " + strconv.Itoa(puppetRunTimeout) + "s, Puppet runs: " + strconv.Itoa(puppetRuns))
+
+			for r := 1; r <= puppetRuns; r++ {
+				runCount := strconv.Itoa(r)
+				log.Debugf("Running puppet, run #" + runCount)
+
+				cmd := exec.Command(puppetExecutable, puppetParam...)
+				c := make(chan struct{})
+				go runCommand(cmd, c) // Read output
+				c <- struct{}{}
+
+				cmd.Start()
+				puppetRunTimeStart := time.Now()
+
+				c1 := make(chan error)
+				go func() {	c1 <- cmd.Wait() }()
+
+				select {
+				case <-time.After(time.Duration(puppetRunTimeout) * time.Second):
+					log.Debugf("Puppet run timeout reached, killing puppet !")
+					cmd.Process.Kill()
+					killPuppet()
+				case res := <-c1:
+					if res != nil {
+						if exitError, ok := err.(*exec.ExitError); ok {
+							switch exitError.ExitCode() {
+							case 1:
+								log.Debugf("Puppet did not run and ended with error, code 1 !")
+							case 2:
+								log.Debugf("Puppet run succeeded, and some resources were changed, code 2 !")
+							case 4:
+								log.Debugf("Puppet run succeeded, and some resources failed, code 4 !")
+							case 6:
+								log.Debugf("Puppet run succeeded, and included both changes and failures, code 6 !")
+							default:
+								log.Debugf("Puppet ended up with unknown error, code " + strconv.Itoa(exitError.ExitCode()))
+							}
+						}
+						if puppetSslError {
+							log.Debugf("Puppet SSL Error detected !")
+							foremanDelete(hostFqdn)
+							data, err := foremanCreate(jsonText)
+							if err != nil {
+								log.Errorf("Failed to create host in foreman !")
+								return
+							}
+							hostId := strconv.FormatFloat(data["id"].(float64), 'f', 0, 64)
+							log.Debugf("Host created, id: " + hostId)
+							var puppetSsl string
+							if puppetVersion == 4 {
+								puppetSsl = "/etc/puppetlabs/puppet/ssl"
+							} else {
+								puppetSsl = "/var/lib/puppet/ssl"
+							}
+							puppetSslFix := exec.Command("rm", "-rf", puppetSsl)
+							s := make(chan struct{})
+							go runCommand(puppetSslFix, s)
+							s <- struct{}{}
+							puppetSslFix.Start()
+							<-s
+							if err := puppetSslFix.Wait(); err != nil {
+								log.Debugf("Error deleting Puppet SSL dir !")
+							}
+						}
+						if puppetCaError {
+							randomTime := rand.Intn(180 - 60 + 1) + 60
+							log.Debugf("Puppet CA Error detected, sleeping 60s and retrying !")
+							time.Sleep(time.Duration(randomTime) * time.Second)
+							puppetRuns++
+						}
+					} else {
+						log.Debugf("Puppet run succeeded, no changes to system are required, code 0 !")
+						r = puppetRuns + 1
+					}
+				}
+
+				//puppetRunTime := "is_virtual"
+				puppetRunTimeStop := time.Now()
+				puppetRunTime := puppetRunTimeStop.Sub(puppetRunTimeStart)
+				puppetRunTimeSeconds := int(puppetRunTime.Seconds())
+				puppetRunTimeSlice = append(puppetRunTimeSlice, strconv.Itoa(puppetRunTimeSeconds))
+				//		stackconfParameters := make(map[string]string)
+				//			stackconfParameters["stackconf_runtime"] = "200"
+				//strconv.Itoa(puppetRunTime)
+				//		err := foremanUpdateParameters(hostFqdn, stackconfParameters)
+				//	if err != nil {
+				//	log.Debugf("Error inserting paremeters to foreman !")
+				//		}
+			}
+			var stackconfTimeString string
+			for k, v := range puppetRunTimeSlice {
+				delimiter := ""
+				if len(puppetRunTimeSlice) != k+1 {
+					delimiter = ","
+				}
+				stackconfTimeString = stackconfTimeString + v + delimiter
+			}
+			stackconfParameters["stackconf_puppet_runtime"] = stackconfTimeString
 			//strconv.Itoa(puppetRunTime)
-			//		err := foremanUpdateParameters(hostFqdn, stackconfParameters)
-			//	if err != nil {
-			//	log.Debugf("Error inserting paremeters to foreman !")
-			//		}
+			err = foremanUpdateParameters(hostFqdn, stackconfParameters)
+			if err != nil {
+				log.Debugf("Error inserting parameters to foreman !")
+			}
+		} else {
+			log.Debugf("Stackconf would have ran puppet and tested certificates")
 		}
 		stackconfTimeStop := time.Now()
 		stackconfTime := stackconfTimeStop.Sub(stackconfTimeStart)
-		stackconfParameters := make(map[string]string)
 		stackconfTimeSeconds := int(stackconfTime.Seconds())
 		stackconfParameters["stackconf_runtime"] = strconv.Itoa(stackconfTimeSeconds)
-		var stackconfTimeString string
-		for k, v := range puppetRunTimeSlice {
-			delimiter := ""
-			if len(puppetRunTimeSlice) != k+1 {
-				delimiter = ","
-			}
-			stackconfTimeString = stackconfTimeString + v + delimiter
-		}
-		stackconfParameters["stackconf_puppet_runtime"] = stackconfTimeString
-		//strconv.Itoa(puppetRunTime)
-		err = foremanUpdateParameters(hostFqdn, stackconfParameters)
-		if err != nil {
-			log.Debugf("Error inserting parameters to foreman !")
-		}
+
 		log.Debugf("Stackconf run completed sucessfully !")
 	},
 }
@@ -629,19 +654,23 @@ func doMetaSlice(config string, f func(string)) {
 }
 
 func dnsRecordHostA() {
-	err := p.UpdateRecord(domainName, "A", hostName, ipAddress, 10)
-	if err != nil {
-		log.Debugf("Failed to update A record, domain: " + domainName + ", content: " + hostName + ", value: " + ipAddress + " !")
-		return
+	if !noop {
+		err := p.UpdateRecord(domainName, "A", hostName, ipAddress, 10)
+		if err != nil {
+			log.Debugf("Failed to update A record, domain: " + domainName + ", content: " + hostName + ", value: " + ipAddress + " !")
+			return
+		}
 	}
 	log.Debugf("Updated A record, domain: " + domainName + ", content: " + hostName + ", value: " + ipAddress + " !")
 }
 
 func dnsDeleteRecordHostA() {
-	err := p.DeleteRecord(domainName, "A", hostName)
-	if err != nil {
-		log.Debugf("Failed to delete A record, domain: " + domainName + ", content: " + hostName + " !")
-		return
+	if !noop {
+		err := p.DeleteRecord(domainName, "A", hostName)
+		if err != nil {
+			log.Debugf("Failed to delete A record, domain: " + domainName + ", content: " + hostName + " !")
+			return
+		}
 	}
 	log.Debugf("Deleted A record, domain: " + domainName + ", content: " + hostName + " !")
 }
@@ -650,10 +679,12 @@ func dnsRecordHostPtr() {
 	ipAddressSlice := strings.Split(ipAddress, ".")
 	ptrRecord := ipAddressSlice[3] + "." + ipAddressSlice[2] + "." + ipAddressSlice[1] + "." + ipAddressSlice[0] + ".in-addr.arpa."
 	ptrDomain := ipAddressSlice[2] + "." + ipAddressSlice[1] + "." + ipAddressSlice[0] + ".in-addr.arpa"
-	err := p.UpdateRec(ptrDomain, "PTR", ptrRecord, hostFqdn+".", 10)
-	if err != nil {
-		log.Debugf("Failed to update PTR record, domain: " + ptrDomain + ", content: " + ptrRecord + ", value: " + hostFqdn + " !")
-		return
+	if !noop {
+		err := p.UpdateRec(ptrDomain, "PTR", ptrRecord, hostFqdn+".", 10)
+		if err != nil {
+			log.Debugf("Failed to update PTR record, domain: " + ptrDomain + ", content: " + ptrRecord + ", value: " + hostFqdn + " !")
+			return
+		}
 	}
 	log.Debugf("Updated PTR record, domain: " + ptrDomain + ", content: " + ptrRecord + ", value: " + hostFqdn + " !")
 }

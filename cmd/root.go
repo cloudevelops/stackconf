@@ -50,6 +50,8 @@ var noop bool
 var noopMsg string
 var whitelist string
 var deleteDomains bool
+var onlyDNS bool
+var opposite bool
 
 // RootCmd represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{
@@ -79,6 +81,9 @@ func init() {
 	// will be global for your application.
 	RootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.stackconf.yaml)")
 	RootCmd.PersistentFlags().BoolVarP(&noop, "noop", "n", false, "dry run (do not attempt to make any changes)")
+	RootCmd.PersistentFlags().BoolVarP(&onlyDNS, "onlydns", "d", false, "trigger to only manage DNS")
+	RootCmd.PersistentFlags().BoolVarP(&opposite, "opposite", "o", false, "opposites between puppet7 and puppet5 environment")
+
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
 	RootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
@@ -299,6 +304,27 @@ func openstackMeta() (err error) {
 		}
 	} else {
 		log.Debugf("Did not get stackenv variable, will not set environment specific configuration")
+	}
+
+	// If puppet.version is set to 7, update env string
+	if viper.IsSet("puppet.version") {
+		puppetVer := viper.GetInt("puppet.version")
+		if puppetVer == 7 && !strings.HasSuffix(envStr, "7") && envStr != "" {
+			envStr += "7"
+			log.Debugf("Puppet version is 7. Adding 7 to environment string")
+		}
+	}
+
+	// If opposite, add/remove 7 suffix at the end of env string
+	if opposite && envStr != "" {
+		if strings.HasSuffix(envStr, "7") {
+			// Trim last char -> "7"
+			envStr = envStr[:len(envStr)-len("7")]
+			log.Debugf("Opposite enabled, removing 7 suffix from environment string")
+		} else {
+			envStr += "7"
+			log.Debugf("Opposite enabled, adding 7 suffix to environment string")
+		}
 	}
 
 	// Marshall metadata
