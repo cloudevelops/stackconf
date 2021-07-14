@@ -52,6 +52,7 @@ var hostFqdn string
 var hostName string
 var domainName string
 var ipAddress string
+
 //var j *jenkins.Jenkins
 var puppetSslError bool
 var puppetCaError bool
@@ -64,7 +65,7 @@ var createCmd = &cobra.Command{
 	Short: "Create a new stackconf host",
 	Long:  `Create a new stackconf host.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		log.Debugf("Create command: starting, version 0.1.19")
+		log.Debugf("Create command: starting, version 0.1.20")
 		if noop {
 			log.Debugf("NOOP ENABLED! This create run will not do any changes.")
 		}
@@ -273,35 +274,39 @@ var createCmd = &cobra.Command{
 
 		if onlyDNS {
 			log.Debugf("Only DNS will be managed on this run.")
+		}
 
-			// basic dns must be handled before host creation due to foreman conflicts
-			// Configure DNS
-			dnsHost := viper.GetString("dns.config.host")
-			if dnsHost == "" {
-				log.Debugf("DNS host not configure, skipping")
-			} else {
-				log.Debugf("Starting DNS record management for host: " + dnsHost)
-				dnsKey := viper.GetString("dns.config.key")
-				if dnsKey == "" {
-					log.Debugf("DNS key not found !")
-					return
-				}
-
-				// Initialize powerdns
-				dnsNameservers := viper.GetStringSlice("dns.config.nameservers")
-				p = powerdns.NewPowerdns(dnsHost, dnsKey, dnsNameservers)
-				dnsDeleteRecordHostA()
-				dnsRecordHostA()
-				dnsRecordHostPtr()
-				// Lookup for config values and setup records
-				doMetaSliceMap("dns.record.a", dnsRecordA)
-				doMetaSliceMap("dns.record.mya", dnsRecordMyA)
-				doMetaSliceMap("dns.record.cname", dnsRecordCname)
-				doMetaSlice("dns.record.mycname", dnsRecordMyCname)
-				doMetaSlice("dns.record.mypubcname", dnsRecordMyPubCname)
-				doMetaSliceMap("dns.record.roota", dnsRecordRootA)
+		// basic dns must be handled before host creation due to foreman conflicts
+		// Configure DNS
+		dnsHost := viper.GetString("dns.config.host")
+		if dnsHost == "" {
+			log.Debugf("DNS host not configure, skipping")
+		} else {
+			log.Debugf("Starting DNS record management for host: " + dnsHost)
+			dnsKey := viper.GetString("dns.config.key")
+			if dnsKey == "" {
+				log.Debugf("DNS key not found !")
+				return
 			}
 
+			// Initialize powerdns
+			dnsNameservers := viper.GetStringSlice("dns.config.nameservers")
+			p = powerdns.NewPowerdns(dnsHost, dnsKey, dnsNameservers)
+			// All noop is handled inside these methods
+			dnsDeleteRecordHostA()
+			dnsRecordHostA()
+			dnsRecordHostPtr()
+			// Lookup for config values and setup records
+			doMetaSliceMap("dns.record.a", dnsRecordA)
+			doMetaSliceMap("dns.record.mya", dnsRecordMyA)
+			doMetaSliceMap("dns.record.cname", dnsRecordCname)
+			doMetaSlice("dns.record.mycname", dnsRecordMyCname)
+			doMetaSlice("dns.record.mypubcname", dnsRecordMyPubCname)
+			doMetaSliceMap("dns.record.roota", dnsRecordRootA)
+		}
+
+		if onlyDNS {
+			log.Debugf("Only DNS was to be managed this run, exiting.")
 			return
 		}
 
@@ -453,7 +458,7 @@ var createCmd = &cobra.Command{
 				puppetRunTimeStart := time.Now()
 
 				c1 := make(chan error)
-				go func() {	c1 <- cmd.Wait() }()
+				go func() { c1 <- cmd.Wait() }()
 
 				select {
 				case <-time.After(time.Duration(puppetRunTimeout) * time.Second):
@@ -503,7 +508,7 @@ var createCmd = &cobra.Command{
 							}
 						}
 						if puppetCaError {
-							randomTime := rand.Intn(180 - 60 + 1) + 60
+							randomTime := rand.Intn(180-60+1) + 60
 							log.Debugf("Puppet CA Error detected, sleeping 60s and retrying !")
 							time.Sleep(time.Duration(randomTime) * time.Second)
 							puppetRuns++
@@ -583,9 +588,9 @@ func runCommand(cmd *exec.Cmd, c chan struct{}) {
 		}
 
 		if (strings.Contains(e, "sslv3 alert certificate") ||
-		   strings.Contains(e, "puppet-ca/v1/certificate/ca timed out") ||
-		   strings.Contains(e, "Could not request certificate:")) &&
-		   puppetCaRetries > 0 {
+			strings.Contains(e, "puppet-ca/v1/certificate/ca timed out") ||
+			strings.Contains(e, "Could not request certificate:")) &&
+			puppetCaRetries > 0 {
 			puppetCaError = true
 			log.Debugf("Puppet CA Error:" + e)
 			puppetCaRetries--
@@ -727,10 +732,12 @@ func dnsRecordA(hash map[string]interface{}) {
 		pKHostName := pKSplit[0]
 		pKDomainName := strings.Replace(pK, pKHostName+".", "", -1)
 
-		err = p.UpdateRecord(pKDomainName, "A", pKHostName, pV, 10)
-		if err != nil {
-			log.Debugf("Failed to update A record, domain: " + pKDomainName + ", content: " + pKHostName + ", value: " + pV + " !")
-			return
+		if !noop {
+			err = p.UpdateRecord(pKDomainName, "A", pKHostName, pV, 10)
+			if err != nil {
+				log.Debugf("Failed to update A record, domain: " + pKDomainName + ", content: " + pKHostName + ", value: " + pV + " !")
+				return
+			}
 		}
 		log.Debugf("Updated A record, domain: " + pKDomainName + ", content: " + pKHostName + ", value: " + pV + " !")
 	}
@@ -905,6 +912,7 @@ func mySqlRecord(hash map[string]interface{}) {
 	}
 	log.Debugf("Sucessfully inserted SQL record into mysql database " + dbUser + ":<PASS DEDACTED>@tcp(" + dbHost + ":3306)/" + db + " : INSERT INTO " + table + " (" + keys + ") VALUES(" + valuesString + ")")
 }
+
 /*
 func jenkinsJob(hash map[string]interface{}) {
 	uri := hash["uri"].(string)
