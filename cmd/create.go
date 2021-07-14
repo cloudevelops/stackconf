@@ -427,7 +427,12 @@ var createCmd = &cobra.Command{
 		//doMetaSliceMap("jenkins.job", jenkinsJob)
 
 		// Configure Puppet execution
-		puppetServer := viper.GetString("puppet.config.server")
+		var puppetServer string
+		if viper.IsSet("puppet.config.server7") {
+			puppetServer = viper.GetString("puppet.config.server7")
+		} else {
+			puppetServer = viper.GetString("puppet.config.server")
+		}
 		var puppetParam []string
 		if puppetServer == "" {
 			log.Debugf("Puppet Server not found !")
