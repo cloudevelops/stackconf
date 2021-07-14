@@ -251,12 +251,41 @@ var createCmd = &cobra.Command{
 		for metak, metav := range metaparameters {
 			paramMap = make(map[string]string)
 			paramMap["name"] = metak
+			paramMap["value"] = metav
 			if metak == "tier" {
 				tierset = true
 			}
-			paramMap["value"] = metav
 			parameters = append(parameters, paramMap)
 		}
+
+		// Handle new feature:
+		// If foreman.host.parameter.puppetserver7 is set && puppet.version is 7,
+		// replace host puppetserver parameter with the puppetserver7.
+		if viper.IsSet("puppet.version") {
+			if puppetVersion == 7 {
+				var found = false
+				var value7 string
+				for _, entry := range parameters {
+					if entry["name"] == "puppetserver7" {
+						found = true
+						value7 = entry["value"]
+					}
+				}
+				if found {
+					for i, entry := range parameters {
+						if entry["name"] == "puppetserver" {
+							newMap := make(map[string]string)
+							newMap["name"] = "puppetserver"
+							newMap["value"] = value7
+							parameters[i] = newMap
+							log.Debugf("Found puppetserver7 foreman parameter, replacing puppetserver parameter with its value =", value7)
+							break
+						}
+					}
+				}
+			}
+		}
+
 		if err != nil {
 			log.Debugf("Did not find host parameters")
 		}
