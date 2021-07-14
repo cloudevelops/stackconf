@@ -286,6 +286,33 @@ func openstackMeta() (err error) {
 			log.Debugf("Metadata stackenv variable is not present")
 		}
 	}
+
+	// If puppet.version is set to 7, update env string
+	if viper.IsSet("puppet.version") {
+		puppetVer := viper.GetInt("puppet.version")
+		if puppetVer == 7 && !strings.HasSuffix(envStr, "7") && envStr != "" {
+			envStr += "7"
+			log.Debugf("Puppet version is 7. Adding 7 to environment string =", envStr)
+		}
+	}
+
+	// If opposite, add/remove 7 suffix at the end of env string
+	if opposite && envStr != "" {
+		if strings.HasSuffix(envStr, "7") {
+			// Trim last char -> "7"
+			envStr = envStr[:len(envStr)-len("7")]
+			log.Debugf("Opposite enabled, removing 7 suffix from environment string =", envStr)
+		} else {
+			envStr += "7"
+			log.Debugf("Opposite enabled, adding 7 suffix to environment string =", envStr)
+		}
+	}
+
+	if opposite && envStr == "" {
+		log.Criticalf("Stackenv is empty, can't find opposite value. Exiting")
+		os.Exit(2)
+	}
+
 	if envStr != "" {
 		log.Debugf("Did get stackenv variable, will set environment specific configuration fore environment: " + envStr)
 		envData := viper.Get("env." + envStr)
@@ -304,27 +331,6 @@ func openstackMeta() (err error) {
 		}
 	} else {
 		log.Debugf("Did not get stackenv variable, will not set environment specific configuration")
-	}
-
-	// If puppet.version is set to 7, update env string
-	if viper.IsSet("puppet.version") {
-		puppetVer := viper.GetInt("puppet.version")
-		if puppetVer == 7 && !strings.HasSuffix(envStr, "7") && envStr != "" {
-			envStr += "7"
-			log.Debugf("Puppet version is 7. Adding 7 to environment string")
-		}
-	}
-
-	// If opposite, add/remove 7 suffix at the end of env string
-	if opposite && envStr != "" {
-		if strings.HasSuffix(envStr, "7") {
-			// Trim last char -> "7"
-			envStr = envStr[:len(envStr)-len("7")]
-			log.Debugf("Opposite enabled, removing 7 suffix from environment string")
-		} else {
-			envStr += "7"
-			log.Debugf("Opposite enabled, adding 7 suffix to environment string")
-		}
 	}
 
 	// Marshall metadata
