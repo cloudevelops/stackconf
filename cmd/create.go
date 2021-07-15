@@ -258,40 +258,50 @@ var createCmd = &cobra.Command{
 			parameters = append(parameters, paramMap)
 		}
 
-		// Handle new feature
-		if val, ok := metaData["puppet.config.server"]; ok {
-			if _, ok2 := metaData["foreman.host.parameter.puppetserver"]; !ok2 {
+		// THIS IS FUCKING BULLSHIT
+
+		if puppetVersion == 7 {
+			if val, ok := metaData["foreman.host.parameter.puppetserver7"]; ok {
 				metaData["foreman.host.parameter.puppetserver"] = val
+			} else {
+
+			}
+		} else {
+			// enough
+		}
+
+		if puppetVersion == 7 {
+			if val, ok := metaData["foreman.host.parameter.puppetserver7"]; ok {
+				metaData["foreman.host.parameter.puppetserver"] = val
+				log.Debugf("Found puppetserver7 foreman parameter, replacing puppetserver parameter with its value =", val)
+			} else {
+				log.Debugf("Didnt find foreman.host.parameter.puppetserver7")
 			}
 		}
 
-		// Handle new feature:
-		// If foreman.host.parameter.puppet server7 is set && puppet.version is 7,
-		// replace host puppet server parameter with the puppet server7.
-		if puppetVersion != 0 {
-			if puppetVersion == 7 {
-				var found = false
-				var value7 string
-				for _, entry := range parameters {
-					if entry["name"] == "puppetserver7" {
-						found = true
-						value7 = entry["value"]
-					}
-				}
-
-				if found {
-					for i, entry := range parameters {
-						if entry["name"] == "puppetserver" {
-							newMap := make(map[string]string)
-							newMap["name"] = "puppetserver"
-							newMap["value"] = value7
-							parameters[i] = newMap
-							log.Debugf("Found puppetserver7 foreman parameter, replacing puppetserver parameter with its value =", value7)
-							break
-						}
-					}
-				}
+		// Handle new feature
+		if val, ok := metaData["puppet.config.server"]; ok {
+			log.Debugf("puppet.config.server is set")
+			if _, ok2 := metaData["foreman.host.parameter.puppetserver"]; !ok2 {
+				log.Debugf("foreman.host.parameter.puppetserver is not set")
+				log.Debugf("replacing foreman.host.parameter.puppetserver with puppet.config.server")
+				log.Debugf("old value nil", "new value ", val)
+				metaData["foreman.host.parameter.puppetserver"] = val
+			} else {
+				log.Debugf("foreman.host.parameter.puppetserver is set, no change")
 			}
+		} else {
+			log.Debugf("puppet.config.server is not set, skipping")
+		}
+
+		// Print out puppet server
+		if val, ok := metaData["puppet.config.server"]; ok {
+			log.Debugf("Puppet server value=" + val.(string))
+		}
+
+		// Print our foreman puppetserver
+		if val, ok := metaData["foreman.host.parameter.puppetserver"]; ok {
+			log.Debugf("Foreman puppetserver value=" + val.(string))
 		}
 
 		if err != nil {
