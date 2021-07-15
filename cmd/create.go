@@ -258,40 +258,28 @@ var createCmd = &cobra.Command{
 			parameters = append(parameters, paramMap)
 		}
 
-		// THIS IS FUCKING BULLSHIT
-
+		// If puppet version is 7, then check, whether foreman.host.parameter.puppetserver7 is set.
+		// If it's set, replace default puppet server. Same goes for puppet.
 		if puppetVersion == 7 {
 			if val, ok := metaData["foreman.host.parameter.puppetserver7"]; ok {
+				log.Debugf("Foreman puppetserver7 is set: replacing with " + val.(string))
 				metaData["foreman.host.parameter.puppetserver"] = val
-			} else {
-
 			}
-		} else {
-			// enough
-		}
-
-		if puppetVersion == 7 {
-			if val, ok := metaData["foreman.host.parameter.puppetserver7"]; ok {
-				metaData["foreman.host.parameter.puppetserver"] = val
-				log.Debugf("Found puppetserver7 foreman parameter, replacing puppetserver parameter with its value =", val)
-			} else {
-				log.Debugf("Didnt find foreman.host.parameter.puppetserver7")
+			if val, ok := metaData["puppet.config.server7"]; ok {
+				log.Debugf("Puppet.config.server7 is set: replacing with " + val.(string))
+				metaData["puppet.config.server"] = val
 			}
 		}
 
-		// Handle new feature
-		if val, ok := metaData["puppet.config.server"]; ok {
-			log.Debugf("puppet.config.server is set")
-			if _, ok2 := metaData["foreman.host.parameter.puppetserver"]; !ok2 {
-				log.Debugf("foreman.host.parameter.puppetserver is not set")
-				log.Debugf("replacing foreman.host.parameter.puppetserver with puppet.config.server")
-				log.Debugf("old value nil", "new value ", val)
-				metaData["foreman.host.parameter.puppetserver"] = val
+		// If foreman.host.parameter.puppetserver is not set, look up if puppet.config.server is set.
+		// If puppet.config.server is set, then replace the foreman puppet server.
+		if _, ok := metaData["foreman.host.parameter.puppetserver"]; !ok {
+			if val2, ok2 := metaData["puppet.config.server"]; ok2 {
+				metaData["foreman.host.parameter.puppetserver"] = val2
+				log.Debugf("Foreman puppetserver is not set, replacing with puppet.config.server=", val2)
 			} else {
-				log.Debugf("foreman.host.parameter.puppetserver is set, no change")
+				log.Criticalf("Nor foreman or puppetserver environment are set")
 			}
-		} else {
-			log.Debugf("puppet.config.server is not set, skipping")
 		}
 
 		// Print out puppet server
