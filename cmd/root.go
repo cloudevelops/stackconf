@@ -165,7 +165,7 @@ func facter() (err error) {
 	// Run facter and output JSON
 	puppetVersion := viper.GetInt("puppet.version")
 	var facterExecutable string
-	if puppetVersion == 4 {
+	if puppetVersion >= 4 {
 		facterExecutable = "/opt/puppetlabs/bin/facter"
 	} else {
 		facterExecutable = "/usr/bin/facter"

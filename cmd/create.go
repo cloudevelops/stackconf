@@ -75,7 +75,7 @@ var createCmd = &cobra.Command{
 		// Host
 		puppetVersion := viper.GetInt("puppet.version")
 		//spew.Dump(puppetVersion)
-		if puppetVersion == 4 {
+		if puppetVersion >= 4 {
 			hostFqdn = viper.GetString("puppetfacter.networking.fqdn")
 		} else {
 			hostFqdn = viper.GetString("puppetfacter.fqdn")
@@ -160,7 +160,7 @@ var createCmd = &cobra.Command{
 		}
 		// architecture
 		var architectureName string
-		if puppetVersion == 4 {
+		if puppetVersion >= 4 {
 			architectureName = viper.GetString("puppetfacter.os.hardware")
 		} else {
 			architectureName = viper.GetString("puppetfacter.hardwaremodel")
@@ -180,14 +180,14 @@ var createCmd = &cobra.Command{
 		}
 		// operatingsystem
 		var osName string
-		if puppetVersion == 4 {
+		if puppetVersion >= 4 {
 			osName = viper.GetString("puppetfacter.os.name")
 		} else {
 			osName = viper.GetString("puppetfacter.lsbdistid")
 		}
 		var operatingSystemName string
 		if osName == "Ubuntu" {
-			if puppetVersion == 4 {
+			if puppetVersion >= 4 {
 				operatingSystemName = viper.GetString("puppetfacter.os.distro.description")
 			} else {
 				operatingSystemName = viper.GetString("puppetfacter.lsbdistdescription")
@@ -209,7 +209,7 @@ var createCmd = &cobra.Command{
 			return
 		}
 		// ipAddress
-		if puppetVersion == 4 {
+		if puppetVersion >= 4 {
 			iface := viper.GetString("facter.interface")
 			if iface != "" {
 				log.Debugf("Set custom interface to fetch ip from: " + iface)
@@ -232,7 +232,7 @@ var createCmd = &cobra.Command{
 		}
 		// macAddress
 		var macAddress string
-		if puppetVersion == 4 {
+		if puppetVersion >= 4 {
 			macAddress = viper.GetString("puppetfacter.networking.mac")
 		} else {
 			macAddress = viper.GetString("puppetfacter.macaddress")
@@ -442,7 +442,7 @@ var createCmd = &cobra.Command{
 				return
 			} else {
 				log.Debugf("Puppet will run in SRV mode in domain: " + puppetSrv)
-				if puppetVersion == 4 {
+				if puppetVersion >= 4 {
 					puppetParam = []string{"agent", "-tv", "--use_srv_records", "--srv_domain", puppetSrv}
 				} else {
 					puppetParam = []string{"agent", "-tv", "--use_srv_records", "--srv_domain", puppetSrv, "--pluginsync", "--pluginsource", "puppet:///plugins", "--pluginfactsource", "puppet:///pluginfacts", "--configtimeout", "1200"}
@@ -455,7 +455,7 @@ var createCmd = &cobra.Command{
 		// Enable Puppet
 		log.Debugf("Enabling puppet")
 		var puppetExecutable string
-		if puppetVersion == 4 {
+		if puppetVersion >= 4 {
 			puppetExecutable = "/opt/puppetlabs/bin/puppet"
 		} else {
 			puppetExecutable = "/usr/bin/puppet"
@@ -526,7 +526,7 @@ var createCmd = &cobra.Command{
 							hostId := strconv.FormatFloat(data["id"].(float64), 'f', 0, 64)
 							log.Debugf("Host created, id: " + hostId)
 							var puppetSsl string
-							if puppetVersion == 4 {
+							if puppetVersion >= 4 {
 								puppetSsl = "/etc/puppetlabs/puppet/ssl"
 							} else {
 								puppetSsl = "/var/lib/puppet/ssl"
@@ -1206,7 +1206,7 @@ func foremanUpdateParameters(host string, parameters map[string]string) (err err
 func killPuppet() {
 	puppetVersion := viper.GetInt("puppet.version")
 	//spew.Dump(puppetVersion)
-	if puppetVersion == 4 {
+	if puppetVersion >= 4 {
 		hostFqdn = viper.GetString("puppetfacter.networking.fqdn")
 	} else {
 		hostFqdn = viper.GetString("puppetfacter.fqdn")
