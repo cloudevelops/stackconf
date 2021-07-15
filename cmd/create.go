@@ -259,8 +259,10 @@ var createCmd = &cobra.Command{
 		}
 
 		// Handle new feature
-		if metaData["puppet.config.server"] != "" && metaData["foreman.host.parameter.puppetserver"] == "" {
-			metaData["foreman.host.parameter.puppetserver"] = metaData["puppet.config.server"]
+		if val, ok := metaData["puppet.config.server"]; ok {
+			if _, ok2 := metaData["foreman.host.parameter.puppetserver"]; !ok2 {
+				metaData["foreman.host.parameter.puppetserver"] = val
+			}
 		}
 
 		// Handle new feature:
