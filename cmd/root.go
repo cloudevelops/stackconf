@@ -280,8 +280,6 @@ func openstackMeta() (err error) {
 		}
 	}
 
-	viper.WriteConfigAs("last-conf.yaml")
-
 	var envStr string
 	envStr = viper.GetString("stackenv")
 	if envStr != "" {

@@ -258,7 +258,7 @@ var createCmd = &cobra.Command{
 			parameters = append(parameters, paramMap)
 		}
 
-		// Handle newnew feature
+		// Handle new feature
 		if metaData["puppet.config.server"] != "" && metaData["foreman.host.parameter.puppetserver"] == "" {
 			metaData["foreman.host.parameter.puppetserver"] = metaData["puppet.config.server"]
 		}
