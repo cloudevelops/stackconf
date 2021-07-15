@@ -52,6 +52,7 @@ var whitelist string
 var deleteDomains bool
 var onlyDNS bool
 var opposite bool
+var puppetVersion int
 
 // RootCmd represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{
@@ -224,7 +225,12 @@ func openstackMeta() (err error) {
 		log.Errorf("Error while reading JSON !")
 		return
 	}
+
 	m := metadata.(map[string]interface{})
+	if m["puppet.version"] == 7 {
+		puppetVersion = 7
+	}
+
 	// Map JSON and prepend it with openstackmeta key
 	metamash, err := json.Marshal(openstackMetadata{Openstackmetadata: m})
 	if err != nil {
@@ -288,10 +294,9 @@ func openstackMeta() (err error) {
 	}
 
 	// If puppet.version is set to 7, update env string
-	if viper.IsSet("puppet.version") {
-		puppetVer := viper.GetInt("puppet.version")
-		log.Debugf(fmt.Sprintf("Puppet version %d detected, will try to update stackenv", puppetVer))
-		if puppetVer == 7 {
+	if puppetVersion != 0 {
+		log.Debugf(fmt.Sprintf("Puppet version %d detected, will try to update stackenv", puppetVersion))
+		if puppetVersion == 7 {
 			if !strings.HasSuffix(envStr, "7") && envStr != "" {
 				envStr += "7"
 				log.Debugf("Stackenv doesn't end with 7, adding 7 to stackenv =", envStr)
