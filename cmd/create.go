@@ -292,9 +292,6 @@ var createCmd = &cobra.Command{
 			}
 		}
 
-		log.Debugf("Foreman puppetserver:" + metaData["foreman.host.parameter.puppetserver"].(string))
-		log.Debugf("Puppet config server:" + metaData["puppet.config.server"].(string))
-
 		if err != nil {
 			log.Debugf("Did not find host parameters")
 		}
