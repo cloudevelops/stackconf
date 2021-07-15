@@ -227,8 +227,11 @@ func openstackMeta() (err error) {
 	}
 
 	m := metadata.(map[string]interface{})
-	if m["puppet.version"] == 7 {
+	m2 := m["meta"].(map[string]interface{})
+
+	if m2["puppet.version"] == "7" {
 		puppetVersion = 7
+		log.Debugf("Loaded puppet.version == 7 from openstack meta")
 	}
 
 	// Map JSON and prepend it with openstackmeta key
@@ -276,6 +279,9 @@ func openstackMeta() (err error) {
 			}
 		}
 	}
+
+	viper.WriteConfigAs("last-conf.yaml")
+
 	var envStr string
 	envStr = viper.GetString("stackenv")
 	if envStr != "" {
@@ -299,7 +305,7 @@ func openstackMeta() (err error) {
 		if puppetVersion == 7 {
 			if !strings.HasSuffix(envStr, "7") && envStr != "" {
 				envStr += "7"
-				log.Debugf("Stackenv doesn't end with 7, adding 7 to stackenv =", envStr)
+				log.Debugf("Stackenv doesn't end with 7, adding 7 to stackenv = " + envStr)
 			}
 		}
 	}
@@ -309,10 +315,10 @@ func openstackMeta() (err error) {
 		if strings.HasSuffix(envStr, "7") {
 			// Trim last char -> "7"
 			envStr = envStr[:len(envStr)-len("7")]
-			log.Debugf("Opposite enabled, removing 7 suffix from environment string =", envStr)
+			log.Debugf("Opposite enabled, removing 7 suffix from environment string = " + envStr)
 		} else {
 			envStr += "7"
-			log.Debugf("Opposite enabled, adding 7 suffix to environment string =", envStr)
+			log.Debugf("Opposite enabled, adding 7 suffix to environment string = " + envStr)
 		}
 	}
 

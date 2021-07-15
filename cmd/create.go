@@ -258,10 +258,15 @@ var createCmd = &cobra.Command{
 			parameters = append(parameters, paramMap)
 		}
 
+		// Handle newnew feature
+		if metaData["puppet.config.server"] != "" && metaData["foreman.host.parameter.puppetserver"] == "" {
+			metaData["foreman.host.parameter.puppetserver"] = metaData["puppet.config.server"]
+		}
+
 		// Handle new feature:
-		// If foreman.host.parameter.puppetserver7 is set && puppet.version is 7,
-		// replace host puppetserver parameter with the puppetserver7.
-		if viper.IsSet("puppet.version") {
+		// If foreman.host.parameter.puppet server7 is set && puppet.version is 7,
+		// replace host puppet server parameter with the puppet server7.
+		if puppetVersion != 0 {
 			if puppetVersion == 7 {
 				var found = false
 				var value7 string
@@ -271,6 +276,7 @@ var createCmd = &cobra.Command{
 						value7 = entry["value"]
 					}
 				}
+
 				if found {
 					for i, entry := range parameters {
 						if entry["name"] == "puppetserver" {
@@ -285,6 +291,9 @@ var createCmd = &cobra.Command{
 				}
 			}
 		}
+
+		log.Debugf("Foreman puppetserver:" + metaData["foreman.host.parameter.puppetserver"].(string))
+		log.Debugf("Puppet config server:" + metaData["puppet.config.server"].(string))
 
 		if err != nil {
 			log.Debugf("Did not find host parameters")
