@@ -290,9 +290,12 @@ func openstackMeta() (err error) {
 	// If puppet.version is set to 7, update env string
 	if viper.IsSet("puppet.version") {
 		puppetVer := viper.GetInt("puppet.version")
-		if puppetVer == 7 && !strings.HasSuffix(envStr, "7") && envStr != "" {
-			envStr += "7"
-			log.Debugf("Puppet version is 7. Adding 7 to environment string =", envStr)
+		log.Debugf(fmt.Sprintf("Puppet version %d detected, will try to update stackenv", puppetVer))
+		if puppetVer == 7 {
+			if !strings.HasSuffix(envStr, "7") && envStr != "" {
+				envStr += "7"
+				log.Debugf("Stackenv doesn't end with 7, adding 7 to stackenv =", envStr)
+			}
 		}
 	}
 
