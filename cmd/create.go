@@ -243,30 +243,16 @@ var createCmd = &cobra.Command{
 		} else {
 			log.Debugf("Mac Address: " + macAddress)
 		}
-		// parameters
-		var parameters []map[string]string
-		var paramMap map[string]string
-		var tierset bool
-		metaparameters, err := metaGetMerge("foreman.host.parameter")
-		for metak, metav := range metaparameters {
-			paramMap = make(map[string]string)
-			paramMap["name"] = metak
-			paramMap["value"] = metav
-			if metak == "tier" {
-				tierset = true
-			}
-			parameters = append(parameters, paramMap)
-		}
 
 		// If puppet version is 7, then check, whether foreman.host.parameter.puppetserver7 is set.
 		// If it's set, replace default puppet server. Same goes for puppet.
 		if puppetVersion == 7 {
 			if val, ok := metaData["foreman.host.parameter.puppetserver7"]; ok {
-				log.Debugf("Foreman puppetserver7 is set: replacing with " + val.(string))
+				log.Debugf("Foreman puppetserver7 is set: replacing with ", val)
 				metaData["foreman.host.parameter.puppetserver"] = val
 			}
 			if val, ok := metaData["puppet.config.server7"]; ok {
-				log.Debugf("Puppet.config.server7 is set: replacing with " + val.(string))
+				log.Debugf("Puppet.config.server7 is set: replacing with ", val)
 				metaData["puppet.config.server"] = val
 			}
 		}
@@ -290,6 +276,28 @@ var createCmd = &cobra.Command{
 		// Print our foreman puppetserver
 		if val, ok := metaData["foreman.host.parameter.puppetserver"]; ok {
 			log.Debugf("Foreman puppetserver value=" + val.(string))
+		}
+
+		// parameters
+		var parameters []map[string]string
+		var paramMap map[string]string
+		var tierset bool
+		metaparameters, err := metaGetMerge("foreman.host.parameter")
+		for metak, metav := range metaparameters {
+			if metak == "puppetserver" {
+				paramMap = make(map[string]string)
+				paramMap["name"] = metak
+				paramMap["value"] = metaData["foreman.host.parameter.puppetserver"].(string)
+				parameters = append(parameters, paramMap)
+			} else {
+				paramMap = make(map[string]string)
+				paramMap["name"] = metak
+				paramMap["value"] = metav
+				if metak == "tier" {
+					tierset = true
+				}
+				parameters = append(parameters, paramMap)
+			}
 		}
 
 		if err != nil {
@@ -433,12 +441,7 @@ var createCmd = &cobra.Command{
 		//doMetaSliceMap("jenkins.job", jenkinsJob)
 
 		// Configure Puppet execution
-		var puppetServer string
-		if viper.IsSet("puppet.config.server7") {
-			puppetServer = viper.GetString("puppet.config.server7")
-		} else {
-			puppetServer = viper.GetString("puppet.config.server")
-		}
+		var puppetServer string = metaData["puppet.config.server"].(string)
 		var puppetParam []string
 		if puppetServer == "" {
 			log.Debugf("Puppet Server not found !")
