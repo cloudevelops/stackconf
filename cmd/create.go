@@ -65,7 +65,7 @@ var createCmd = &cobra.Command{
 	Short: "Create a new stackconf host",
 	Long:  `Create a new stackconf host.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		log.Debugf("Create command: starting, version 0.1.21")
+		log.Debugf("Create command: starting, version 0.1.22")
 		if noop {
 			log.Debugf("NOOP ENABLED! This create run will not do any changes.")
 		}
@@ -441,7 +441,12 @@ var createCmd = &cobra.Command{
 		//doMetaSliceMap("jenkins.job", jenkinsJob)
 
 		// Configure Puppet execution
-		var puppetServer string = metaData["puppet.config.server"].(string)
+		var puppetServer string
+		if metaData["puppet.config.server"] == nil {
+			puppetServer = ""
+		} else {
+			puppetServer = metaData["puppet.config.server"].(string)
+		}
 		var puppetParam []string
 		if puppetServer == "" {
 			log.Debugf("Puppet Server not found !")

@@ -226,12 +226,17 @@ func openstackMeta() (err error) {
 		return
 	}
 
+	var m2 map[string]interface{}
 	m := metadata.(map[string]interface{})
-	m2 := m["meta"].(map[string]interface{})
+	if m2unset, ok := m["meta"]; ok {
+		m2 = m2unset.(map[string]interface{})
+	}
 
-	if m2["puppet.version"] == "7" {
-		puppetVersion = 7
-		log.Debugf("Loaded puppet.version == 7 from openstack meta")
+	if m2 != nil {
+		if m2["puppet.version"] == "7" {
+			puppetVersion = 7
+			log.Debugf("Loaded puppet.version == 7 from openstack meta")
+		}
 	}
 
 	// Map JSON and prepend it with openstackmeta key
