@@ -65,7 +65,7 @@ var createCmd = &cobra.Command{
 	Short: "Create a new stackconf host",
 	Long:  `Create a new stackconf host.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		log.Debugf("Create command: starting, version 0.1.22")
+		log.Debugf("Create command: starting, version 0.1.23")
 		if noop {
 			log.Debugf("NOOP ENABLED! This create run will not do any changes.")
 		}
