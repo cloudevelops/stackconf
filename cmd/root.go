@@ -53,6 +53,7 @@ var deleteDomains bool
 var onlyDNS bool
 var opposite bool
 var puppetVersion int
+var overriddenStackenv string
 
 // RootCmd represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{
@@ -81,6 +82,7 @@ func init() {
 	// Cobra supports persistent flags, which, if defined here,
 	// will be global for your application.
 	RootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.stackconf.yaml)")
+	RootCmd.PersistentFlags().StringVar(&overriddenStackenv, "stackenv", "", "override stackenv value")
 	RootCmd.PersistentFlags().BoolVarP(&noop, "noop", "n", false, "dry run (do not attempt to make any changes)")
 	RootCmd.PersistentFlags().BoolVarP(&onlyDNS, "onlydns", "d", false, "trigger to only manage DNS")
 	RootCmd.PersistentFlags().BoolVarP(&opposite, "opposite", "o", false, "opposites between puppet7 and puppet5 environment")
@@ -286,10 +288,20 @@ func openstackMeta() (err error) {
 	}
 
 	var envStr string
-	envStr = viper.GetString("stackenv")
-	if envStr != "" {
-		log.Debugf("Using stackenv environment defined in config file: " + envStr)
+	if overriddenStackenv != "" {
+		envStr = overriddenStackenv
+		log.Debugf("Using overridden environment through flag: " + envStr)
+
+		if opposite {
+			log.Debugf("Stackenv defined through flag, opposite will have no effect.")
+		}
 	} else {
+		envStr = viper.GetString("stackenv")
+		if envStr != "" {
+			log.Debugf("Using stackenv environment defined in config file: " + envStr)
+		}
+	}
+	if envStr == "" {
 		env := metaData["stackenv"]
 		if env != nil {
 			var ok bool
@@ -302,32 +314,34 @@ func openstackMeta() (err error) {
 		}
 	}
 
-	// If puppet.version is set to 7, update env string
-	if puppetVersion != 0 {
-		log.Debugf(fmt.Sprintf("Puppet version %d detected, will try to update stackenv", puppetVersion))
-		if puppetVersion == 7 {
-			if !strings.HasSuffix(envStr, "7") && envStr != "" {
-				envStr += "7"
-				log.Debugf("Stackenv doesn't end with 7, adding 7 to stackenv = " + envStr)
+	if overriddenStackenv == "" {
+		// If puppet.version is set to 7, update env string
+		if puppetVersion != 0 {
+			log.Debugf(fmt.Sprintf("Puppet version %d detected, will try to update stackenv", puppetVersion))
+			if puppetVersion == 7 {
+				if !strings.HasSuffix(envStr, "7") && envStr != "" {
+					envStr += "7"
+					log.Debugf("Stackenv doesn't end with 7, adding 7 to stackenv = " + envStr)
+				}
 			}
 		}
-	}
 
-	// If opposite, add/remove 7 suffix at the end of env string
-	if opposite && envStr != "" {
-		if strings.HasSuffix(envStr, "7") {
-			// Trim last char -> "7"
-			envStr = envStr[:len(envStr)-len("7")]
-			log.Debugf("Opposite enabled, removing 7 suffix from environment string = " + envStr)
-		} else {
-			envStr += "7"
-			log.Debugf("Opposite enabled, adding 7 suffix to environment string = " + envStr)
+		// If opposite, add/remove 7 suffix at the end of env string
+		if opposite && envStr != "" {
+			if strings.HasSuffix(envStr, "7") {
+				// Trim last char -> "7"
+				envStr = envStr[:len(envStr)-len("7")]
+				log.Debugf("Opposite enabled, removing 7 suffix from environment string = " + envStr)
+			} else {
+				envStr += "7"
+				log.Debugf("Opposite enabled, adding 7 suffix to environment string = " + envStr)
+			}
 		}
-	}
 
-	if opposite && envStr == "" {
-		log.Criticalf("Stackenv is empty, can't find opposite value. Exiting")
-		os.Exit(2)
+		if opposite && envStr == "" {
+			log.Criticalf("Stackenv is empty, can't find opposite value. Exiting")
+			os.Exit(2)
+		}
 	}
 
 	if envStr != "" {
