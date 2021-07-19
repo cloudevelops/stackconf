@@ -52,10 +52,13 @@ to quickly create a Cobra application.`,
 		if err == nil {
 			log.Debugf("Host exists, deleting")
 			hostId := strconv.FormatFloat(host["id"].(float64), 'f', -1, 64)
-			err := f.DeleteHost(hostId)
-			if err != nil {
-				log.Debugf("Host deletion failed")
+			if !noop {
+				err := f.DeleteHost(hostId)
+				if err != nil {
+					log.Debugf("Host deletion failed")
+				}
 			}
+			log.Debugf("Deleted host " + hostId)
 		}
 	},
 }
