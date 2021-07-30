@@ -91,7 +91,7 @@ func init() {
 	// when this action is called directly.
 	RootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 	deleteenvCmd.Flags().StringVarP(&whitelist, "whitelist", "w", "", "Whitelisted entries not to be deleted, comma separated")
-	deleteenvCmd.Flags().BoolVarP(&deleteDomains, "deletedomains", "d", false, "Domains will be deleted based on input match")
+	deleteenvCmd.Flags().BoolVarP(&deleteDomains, "deletedomains", "e", false, "Domains will be deleted based on input match")
 }
 
 // initConfig reads in config file and ENV variables if set.
