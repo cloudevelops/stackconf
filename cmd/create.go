@@ -1239,6 +1239,17 @@ func killPuppet() {
 			if err != nil {
 				log.Debugf("Killing puppet agent failed !")
 			}
+			if _, err := os.Stat("/opt/puppetlabs/puppet/cache/state/agent_catalog_run.lock"); err == nil {
+				log.Debugf("puppet agent .lock file exists, removing")
+				e := os.Remove("/opt/puppetlabs/puppet/cache/state/agent_catalog_run.lock")
+				if e != nil {
+					log.Fatal(e)
+				} else{
+					log.Debugf("puppet agent .lock removed")
+				}
+			 } else {
+				log.Debugf("puppet agent .lock file does not exists, nothing to do")
+			 }
 			processcount++
 		}
 	}
