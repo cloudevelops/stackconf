@@ -1244,7 +1244,7 @@ func killPuppet() {
 				log.Debugf("puppet agent .lock file exists, removing")
 				e := os.Remove("/opt/puppetlabs/puppet/cache/state/agent_catalog_run.lock")
 				if e != nil {
-					log.Errorf(e)
+					log.Errorf("Could not remove puppet agent .lock")
 				} else{
 					log.Debugf("puppet agent .lock removed")
 				}
