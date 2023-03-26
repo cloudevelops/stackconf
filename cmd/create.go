@@ -44,6 +44,7 @@ import (
 
 	"github.com/cloudevelops/go-powerdns"
 	"github.com/shirou/gopsutil/process"
+	"os"
 )
 
 var p *powerdns.Powerdns
@@ -1243,7 +1244,7 @@ func killPuppet() {
 				log.Debugf("puppet agent .lock file exists, removing")
 				e := os.Remove("/opt/puppetlabs/puppet/cache/state/agent_catalog_run.lock")
 				if e != nil {
-					log.Fatal(e)
+					log.Errorf(e)
 				} else{
 					log.Debugf("puppet agent .lock removed")
 				}
