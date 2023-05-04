@@ -44,6 +44,7 @@ import (
 
 	"github.com/cloudevelops/go-powerdns"
 	"github.com/shirou/gopsutil/process"
+	"os"
 )
 
 var p *powerdns.Powerdns
@@ -65,7 +66,7 @@ var createCmd = &cobra.Command{
 	Short: "Create a new stackconf host",
 	Long:  `Create a new stackconf host.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		log.Debugf("Create command: starting, version 0.1.26")
+		log.Debugf("Create command: starting, version 0.1.27")
 		if noop {
 			log.Debugf("NOOP ENABLED! This create run will not do any changes.")
 		}
@@ -1239,6 +1240,17 @@ func killPuppet() {
 			if err != nil {
 				log.Debugf("Killing puppet agent failed !")
 			}
+			if _, err := os.Stat("/opt/puppetlabs/puppet/cache/state/agent_catalog_run.lock"); err == nil {
+				log.Debugf("puppet agent .lock file exists, removing")
+				e := os.Remove("/opt/puppetlabs/puppet/cache/state/agent_catalog_run.lock")
+				if e != nil {
+					log.Errorf("Could not remove puppet agent .lock")
+				} else{
+					log.Debugf("puppet agent .lock removed")
+				}
+			 } else {
+				log.Debugf("puppet agent .lock file does not exists, nothing to do")
+			 }
 			processcount++
 		}
 	}
