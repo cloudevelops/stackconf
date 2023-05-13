@@ -66,7 +66,7 @@ var createCmd = &cobra.Command{
 	Short: "Create a new stackconf host",
 	Long:  `Create a new stackconf host.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		log.Debugf("Create command: starting, version 0.1.27")
+		log.Debugf("Create command: starting, version 0.1.28")
 		if noop {
 			log.Debugf("NOOP ENABLED! This create run will not do any changes.")
 		}
@@ -1022,7 +1022,6 @@ func jenkinsJob(hash map[string]interface{}) {
 	}
 	// Inicialize jenkins
 	j = jenkins.NewJenkins(jenkinsHost, jenkinsUser, jenkinsPassword)
-
 	//	jobXmlBytes := []byte(jobXml)
 	job := html.UnescapeString(jobXml)
 	projectName := html.EscapeString(name)
@@ -1245,12 +1244,12 @@ func killPuppet() {
 				e := os.Remove("/opt/puppetlabs/puppet/cache/state/agent_catalog_run.lock")
 				if e != nil {
 					log.Errorf("Could not remove puppet agent .lock")
-				} else{
+				} else {
 					log.Debugf("puppet agent .lock removed")
 				}
-			 } else {
+			} else {
 				log.Debugf("puppet agent .lock file does not exists, nothing to do")
-			 }
+			}
 			processcount++
 		}
 	}
