@@ -153,18 +153,21 @@ func initConfig() {
 // Get response func for meta-data JSON
 func getResponse(url string, attempts int, delay time.Duration) *http.Response {
 	response, _ := httpClient.Get(url)
+
 	for i := 0; ; i++ {
-		err := response
-		if err == nil {
+		response, err := httpClient.Get(url)
+		if err != nil {
 			fmt.Println("Error occurred - sleep for 1 minute!")
 			time.Sleep(delay)
+		} else {
+			return response
 		}
 
 		if i >= (attempts - 1) {
 			break
 		}
-
 	}
+
 	return response
 }
 
