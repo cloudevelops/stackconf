@@ -39,6 +39,7 @@ write_files:
 * puppet.config.ca - ca server which is uded for puppet run
 * puppet.config.environment - environment for puppet run
 * puppet.config.server - specific puppet server to use, has priority over puppet.config.srv
+* puppet config.sleep - wait time after puppet was killed
 * foreman.config.username - username for foreman access
 * foreman.config.password - password for foreman access
 * foreman.config.host - host used for foreman access

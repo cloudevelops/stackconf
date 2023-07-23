@@ -120,6 +120,7 @@ func initConfig() {
 	viper.SetDefault("stackconf.sources", []string{"openstackmeta", "puppetfacter"})
 	viper.SetDefault("puppet.config.runs", 3)
 	viper.SetDefault("puppet.config.runtimeout", 900)
+	viper.SetDefault("puppet.config.sleep", 30)
 	if _, err := os.Stat("/opt/puppetlabs/bin/puppet"); err == nil {
 		viper.SetDefault("puppet.version", 4)
 	} else {
@@ -148,6 +149,27 @@ func initConfig() {
 			log.Errorf("Openstackmeta failed: critical error")
 		}
 	}
+}
+
+// Get response func for meta-data JSON
+func getResponse(url string, attempts int, delay time.Duration) *http.Response {
+	response, _ := httpClient.Get(url)
+
+	for i := 0; ; i++ {
+		response, err := httpClient.Get(url)
+		if err != nil {
+			fmt.Println("Error occurred - sleep for 1 minute!")
+			time.Sleep(delay)
+		} else {
+			return response
+		}
+
+		if i >= (attempts - 1) {
+			break
+		}
+	}
+
+	return response
 }
 
 func isInArray(val string, array []string) (ok bool) {
@@ -208,23 +230,24 @@ func openstackMeta() (err error) {
 	var mv map[string]interface{}
 	var envmeta string
 
-	r, err := httpClient.Get("http://169.254.169.254/openstack/latest/meta_data.json")
-	if err != nil {
-		log.Errorf("HTTP request to Openstack Metadata failed !")
+	var r = getResponse("http://169.254.169.254/openstack/latest/meta_data.json", 3, time.Minute*1)
+	if r == nil {
+		log.Errorf("HTTP request to Openstack Metadata failed!")
 		return
 	}
+
 	if r.StatusCode < 200 || r.StatusCode > 299 {
 		log.Errorf("HTTP request to Openstack Metadata failed, error: " + r.Status + "!")
 		return
 	}
 	response, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		log.Errorf("Error reading body !")
+		log.Errorf("Error reading body!")
 		return
 	}
 	err = json.Unmarshal(response, &metadata)
 	if err != nil {
-		log.Errorf("Error while reading JSON !")
+		log.Errorf("Error while reading JSON!")
 		return
 	}
 
@@ -244,7 +267,7 @@ func openstackMeta() (err error) {
 	// Map JSON and prepend it with openstackmeta key
 	metamash, err := json.Marshal(openstackMetadata{Openstackmetadata: m})
 	if err != nil {
-		log.Debugf("Openstackmeta JSON prepend failed !")
+		log.Debugf("Openstackmeta JSON prepend failed!")
 		return
 	}
 	// Load Openstack metadata into Viper
@@ -266,7 +289,7 @@ func openstackMeta() (err error) {
 	// Iterate again, append to environment metadata and overwrite if needed
 	err = json.Unmarshal([]byte(envmeta), &metaData)
 	if err != nil {
-		log.Debugf("Failed to Unmarshal env metadata:" + envmeta + " !")
+		log.Debugf("Failed to Unmarshal env metadata:" + envmeta + "!")
 		return
 	}
 	for k, v := range mv {

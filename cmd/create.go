@@ -66,7 +66,7 @@ var createCmd = &cobra.Command{
 	Short: "Create a new stackconf host",
 	Long:  `Create a new stackconf host.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		log.Debugf("Create command: starting, version 0.1.27")
+		log.Debugf("Create command: starting, version 0.1.29")
 		if noop {
 			log.Debugf("NOOP ENABLED! This create run will not do any changes.")
 		}
@@ -88,7 +88,7 @@ var createCmd = &cobra.Command{
 		//Hostgroup
 		hostGroupName := viper.GetString("foreman.host.hostgroup")
 		if hostGroupName == "" {
-			log.Debugf("Hostgroup not found !")
+			log.Debugf("Hostgroup not found!")
 			return
 		}
 		hostGroup, err := f.SearchResource("hostgroups", hostGroupName)
@@ -97,7 +97,7 @@ var createCmd = &cobra.Command{
 			hostGroupId = strconv.FormatFloat(hostGroup["id"].(float64), 'f', -1, 64)
 			log.Debugf("Hostgroup found, name: " + hostGroupName + "; id: " + hostGroupId)
 		} else {
-			log.Errorf("Hostgroup doesnt exist !")
+			log.Errorf("Hostgroup doesnt exist!")
 			return
 		}
 		// Organization
@@ -109,7 +109,7 @@ var createCmd = &cobra.Command{
 			organizationId = strconv.FormatFloat(organization["id"].(float64), 'f', -1, 64)
 			log.Debugf("Organization found, name: " + organizationName + "; id: " + organizationId)
 		} else {
-			log.Errorf("Organization doesnt exist !")
+			log.Errorf("Organization doesnt exist!")
 			return
 		}
 
@@ -126,13 +126,13 @@ var createCmd = &cobra.Command{
 			locationId = strconv.FormatFloat(location["id"].(float64), 'f', -1, 64)
 			log.Debugf("Location found, name: " + locationName + "; id: " + locationId)
 		} else {
-			log.Errorf("Location doesnt exist !")
+			log.Errorf("Location doesnt exist!")
 			return
 		}
 		// puppetca
 		puppetCaName := viper.GetString("puppet.config.ca")
 		if hostGroupName == "" {
-			log.Debugf("Puppet CA not found !")
+			log.Debugf("Puppet CA not found!")
 			return
 		}
 		puppetCa, err := f.SearchResource("smart_proxies", puppetCaName)
@@ -141,13 +141,13 @@ var createCmd = &cobra.Command{
 			puppetCaId = strconv.FormatFloat(puppetCa["id"].(float64), 'f', -1, 64)
 			log.Debugf("Puppet CA found, name: " + puppetCaName + "; id: " + puppetCaId)
 		} else {
-			log.Errorf("Puppet CA doesnt exist !")
+			log.Errorf("Puppet CA doesnt exist!")
 			return
 		}
 		// environment
 		puppetEnvironmentName := viper.GetString("puppet.config.environment")
 		if puppetEnvironmentName == "" {
-			log.Debugf("Puppet Environment not found !")
+			log.Debugf("Puppet Environment not found!")
 			return
 		}
 		puppetEnvironment, err := f.SearchResource("environments", puppetEnvironmentName)
@@ -156,7 +156,7 @@ var createCmd = &cobra.Command{
 			puppetEnvironmentId = strconv.FormatFloat(puppetEnvironment["id"].(float64), 'f', -1, 64)
 			log.Debugf("Puppet Environment found, name: " + puppetEnvironmentName + "; id: " + puppetEnvironmentId)
 		} else {
-			log.Errorf("Puppet Environment doesnt exist !")
+			log.Errorf("Puppet Environment doesnt exist!")
 			return
 		}
 		// architecture
@@ -167,7 +167,7 @@ var createCmd = &cobra.Command{
 			architectureName = viper.GetString("puppetfacter.hardwaremodel")
 		}
 		if architectureName == "" {
-			log.Debugf("Architecture not found !")
+			log.Debugf("Architecture not found!")
 			return
 		}
 		architecture, err := f.SearchResource("architectures", architectureName)
@@ -176,7 +176,7 @@ var createCmd = &cobra.Command{
 			architectureId = strconv.FormatFloat(architecture["id"].(float64), 'f', -1, 64)
 			log.Debugf("Architecture found, name: " + architectureName + "; id: " + architectureId)
 		} else {
-			log.Errorf("Architecture doesnt exist !")
+			log.Errorf("Architecture doesnt exist!")
 			return
 		}
 		// operatingsystem
@@ -197,7 +197,7 @@ var createCmd = &cobra.Command{
 			operatingSystemName = viper.GetString("puppetfacter.os.distro.id") + " " + viper.GetString("puppetfacter.os.distro.release.full")
 		}
 		if operatingSystemName == "" {
-			log.Debugf("Operating System not found !")
+			log.Debugf("Operating System not found!")
 			return
 		}
 		operatingSystem, err := f.SearchResource("operatingsystems", operatingSystemName)
@@ -206,7 +206,7 @@ var createCmd = &cobra.Command{
 			operatingSystemId = strconv.FormatFloat(operatingSystem["id"].(float64), 'f', -1, 64)
 			log.Debugf("Operating System found, name: " + operatingSystemName + "; id: " + operatingSystemId)
 		} else {
-			log.Errorf("Operating System doesnt exist !" + operatingSystemName)
+			log.Errorf("Operating System doesnt exist!" + operatingSystemName)
 			return
 		}
 		// ipAddress
@@ -226,7 +226,7 @@ var createCmd = &cobra.Command{
 			ipAddress = viper.GetString("puppetfacter.ipaddress")
 		}
 		if ipAddress == "" {
-			log.Debugf("IP Address not found !")
+			log.Debugf("IP Address not found!")
 			return
 		} else {
 			log.Debugf("IP Address: " + ipAddress)
@@ -239,7 +239,7 @@ var createCmd = &cobra.Command{
 			macAddress = viper.GetString("puppetfacter.macaddress")
 		}
 		if macAddress == "" {
-			log.Debugf("Mac Address not found !")
+			log.Debugf("Mac Address not found!")
 			return
 		} else {
 			log.Debugf("Mac Address: " + macAddress)
@@ -329,7 +329,7 @@ var createCmd = &cobra.Command{
 			log.Debugf("Starting DNS record management for host: " + dnsHost)
 			dnsKey := viper.GetString("dns.config.key")
 			if dnsKey == "" {
-				log.Debugf("DNS key not found !")
+				log.Debugf("DNS key not found!")
 				return
 			}
 
@@ -357,7 +357,7 @@ var createCmd = &cobra.Command{
 		if !noop {
 			err = foremanDelete(hostFqdn)
 			if err != nil {
-				log.Debugf("Foreman failed to delete host !")
+				log.Debugf("Foreman failed to delete host!")
 			}
 		}
 		log.Debugf("Deleted host " + hostFqdn)
@@ -428,7 +428,7 @@ var createCmd = &cobra.Command{
 		if !noop {
 			data, err := foremanCreate(jsonText)
 			if err != nil {
-				log.Errorf("Failed to create host in foreman !")
+				log.Errorf("Failed to create host in foreman!")
 				return
 			}
 			hostId := strconv.FormatFloat(data["id"].(float64), 'f', 0, 64)
@@ -450,7 +450,7 @@ var createCmd = &cobra.Command{
 		}
 		var puppetParam []string
 		if puppetServer == "" {
-			log.Debugf("Puppet Server not found !")
+			log.Debugf("Puppet Server not found!")
 			puppetSrv := viper.GetString("puppet.config.srv")
 			if puppetSrv == "" {
 				log.Errorf("Puppet Server or SRV not found, exiting !")
@@ -511,31 +511,33 @@ var createCmd = &cobra.Command{
 
 				select {
 				case <-time.After(time.Duration(puppetRunTimeout) * time.Second):
-					log.Debugf("Puppet run timeout reached, killing puppet !")
+					log.Debugf("Puppet run timeout reached, killing puppet!")
 					cmd.Process.Kill()
 					killPuppet()
+
+					wait(viper.GetInt("puppet.config.sleep"))
 				case res := <-c1:
 					if res != nil {
 						if exitError, ok := err.(*exec.ExitError); ok {
 							switch exitError.ExitCode() {
 							case 1:
-								log.Debugf("Puppet did not run and ended with error, code 1 !")
+								log.Debugf("Puppet did not run and ended with error, code 1!")
 							case 2:
-								log.Debugf("Puppet run succeeded, and some resources were changed, code 2 !")
+								log.Debugf("Puppet run succeeded, and some resources were changed, code 2!")
 							case 4:
-								log.Debugf("Puppet run succeeded, and some resources failed, code 4 !")
+								log.Debugf("Puppet run succeeded, and some resources failed, code 4!")
 							case 6:
-								log.Debugf("Puppet run succeeded, and included both changes and failures, code 6 !")
+								log.Debugf("Puppet run succeeded, and included both changes and failures, code 6!")
 							default:
 								log.Debugf("Puppet ended up with unknown error, code " + strconv.Itoa(exitError.ExitCode()))
 							}
 						}
 						if puppetSslError {
-							log.Debugf("Puppet SSL Error detected !")
+							log.Debugf("Puppet SSL Error detected!")
 							foremanDelete(hostFqdn)
 							data, err := foremanCreate(jsonText)
 							if err != nil {
-								log.Errorf("Failed to create host in foreman !")
+								log.Errorf("Failed to create host in foreman!")
 								return
 							}
 							hostId := strconv.FormatFloat(data["id"].(float64), 'f', 0, 64)
@@ -553,17 +555,17 @@ var createCmd = &cobra.Command{
 							puppetSslFix.Start()
 							<-s
 							if err := puppetSslFix.Wait(); err != nil {
-								log.Debugf("Error deleting Puppet SSL dir !")
+								log.Debugf("Error deleting Puppet SSL dir!")
 							}
 						}
 						if puppetCaError {
 							randomTime := rand.Intn(180-60+1) + 60
-							log.Debugf("Puppet CA Error detected, sleeping 60s and retrying !")
+							log.Debugf("Puppet CA Error detected, sleeping 60s and retrying!")
 							time.Sleep(time.Duration(randomTime) * time.Second)
 							puppetRuns++
 						}
 					} else {
-						log.Debugf("Puppet run succeeded, no changes to system are required, code 0 !")
+						log.Debugf("Puppet run succeeded, no changes to system are required, code 0!")
 						r = puppetRuns + 1
 					}
 				}
@@ -593,7 +595,7 @@ var createCmd = &cobra.Command{
 			//strconv.Itoa(puppetRunTime)
 			err = foremanUpdateParameters(hostFqdn, stackconfParameters)
 			if err != nil {
-				log.Debugf("Error inserting parameters to foreman !")
+				log.Debugf("Error inserting parameters to foreman!")
 			}
 		} else {
 			log.Debugf("Stackconf would have ran puppet and tested certificates")
@@ -603,7 +605,7 @@ var createCmd = &cobra.Command{
 		stackconfTimeSeconds := int(stackconfTime.Seconds())
 		stackconfParameters["stackconf_runtime"] = strconv.Itoa(stackconfTimeSeconds)
 
-		log.Debugf("Stackconf run completed sucessfully !")
+		log.Debugf("Stackconf run completed sucessfully!")
 	},
 }
 
@@ -669,7 +671,7 @@ func doMetaSliceMap(config string, f func(map[string]interface{})) {
 					if ok {
 						f(islicemap)
 					} else {
-						log.Debugf("Array value in " + config + " is not a Hash !")
+						log.Debugf("Array value in " + config + " is not a Hash!")
 					}
 				}
 			} else {
@@ -697,7 +699,7 @@ func doMetaSlice(config string, f func(string)) {
 					if ok {
 						f(islicestring)
 					} else {
-						log.Debugf("Array value in " + config + " is not a String !")
+						log.Debugf("Array value in " + config + " is not a String!")
 					}
 				}
 			} else {
@@ -863,11 +865,11 @@ func dnsRecordMyPubCname(s string) {
 	if !noop {
 		err = p.UpdateRecord(pSDomainName, "CNAME", pSHostName, hostFqdn+".", 10)
 		if err != nil {
-			log.Debugf("Failed to update CNAME record, domain: " + pSDomainName + ", content: " + pSHostName + ", value: " + hostFqdn + ". !")
+			log.Debugf("Failed to update CNAME record, domain: " + pSDomainName + ", content: " + pSHostName + ", value: " + hostFqdn + ".!")
 			return
 		}
 	}
-	log.Debugf("Updated CNAME record, domain: " + pSDomainName + ", content: " + pSHostName + ", value: " + hostFqdn + ". !")
+	log.Debugf("Updated CNAME record, domain: " + pSDomainName + ", content: " + pSHostName + ", value: " + hostFqdn + ".!")
 }
 
 func dnsRecordMyCname(s string) {
@@ -879,17 +881,17 @@ func dnsRecordMyCname(s string) {
 	if !noop {
 		err = p.UpdateRecord(domainName, "CNAME", pS, hostFqdn+".", 10)
 		if err != nil {
-			log.Debugf("Failed to update CNAME record, domain: " + domainName + ", content: " + pS + ", value: " + hostFqdn + ". !")
+			log.Debugf("Failed to update CNAME record, domain: " + domainName + ", content: " + pS + ", value: " + hostFqdn + ".!")
 			return
 		}
 	}
-	log.Debugf("Updated CNAME record, domain: " + domainName + ", content: " + pS + ", value: " + hostFqdn + ". !")
+	log.Debugf("Updated CNAME record, domain: " + domainName + ", content: " + pS + ", value: " + hostFqdn + ".!")
 }
 
 func mySqlRecord(hash map[string]interface{}) {
 	uri := hash["uri"].(string)
 	if len(uri) == 0 {
-		log.Errorf("URI empty in mysql.record !")
+		log.Errorf("URI empty in mysql.record!")
 		return
 	}
 	uriSplit := strings.Split(uri, ".")
@@ -897,32 +899,32 @@ func mySqlRecord(hash map[string]interface{}) {
 	table := uriSplit[1]
 	dbHostRaw := viper.GetString("mysql.db." + db + ".host")
 	if dbHostRaw == "" {
-		log.Errorf("DB Host mysql.db." + db + ".host not found in config !")
+		log.Errorf("DB Host mysql.db." + db + ".host not found in config!")
 		return
 	}
 	dbHost, err := metaTemplate(dbHostRaw)
 	if err != nil {
-		log.Errorf("DB Host value " + dbHostRaw + "failed to be parsed !")
+		log.Errorf("DB Host value " + dbHostRaw + "failed to be parsed!")
 		return
 	}
 	dbUser := viper.GetString("mysql.db." + db + ".user")
 	if dbUser == "" {
-		log.Errorf("DB User mysql.db." + db + ".user not found in config !")
+		log.Errorf("DB User mysql.db." + db + ".user not found in config!")
 		return
 	}
 	dbPassword := viper.GetString("mysql.db." + db + ".password")
 	if dbPassword == "" {
-		log.Errorf("DB Password mysql.db." + db + ".password not found in config !")
+		log.Errorf("DB Password mysql.db." + db + ".password not found in config!")
 		return
 	}
 	template := hash["template"].(string)
 	if len(template) == 0 {
-		log.Errorf("Template empty in mysql.record !")
+		log.Errorf("Template empty in mysql.record!")
 		return
 	}
 	data := viper.Get(template).(map[string]interface{})
 	if data == nil {
-		log.Errorf("Template data " + template + " not found in config !")
+		log.Errorf("Template data " + template + " not found in config!")
 		return
 	}
 	dataLength := len(data)
@@ -1022,7 +1024,6 @@ func jenkinsJob(hash map[string]interface{}) {
 	}
 	// Inicialize jenkins
 	j = jenkins.NewJenkins(jenkinsHost, jenkinsUser, jenkinsPassword)
-
 	//	jobXmlBytes := []byte(jobXml)
 	job := html.UnescapeString(jobXml)
 	projectName := html.EscapeString(name)
@@ -1056,25 +1057,25 @@ func jenkinsJob(hash map[string]interface{}) {
 func foremanCreate(jsonText []byte) (map[string]interface{}, error) {
 	data, err := f.Post("hosts", jsonText)
 	if err != nil {
-		log.Errorf("Error creating host, retrying in 5s !")
+		log.Errorf("Error creating host, retrying in 5s!")
 		time.Sleep(5 * time.Second)
 		data, err = f.Post("hosts", jsonText)
 		if err != nil {
-			log.Errorf("Error creating host, retrying in 15s !")
+			log.Errorf("Error creating host, retrying in 15s!")
 			time.Sleep(15 * time.Second)
 			data, err = f.Post("hosts", jsonText)
 			if err != nil {
-				log.Errorf("Error creating host, retrying in 60s !")
+				log.Errorf("Error creating host, retrying in 60s!")
 				for i := 1; i < 31; i++ {
 					time.Sleep(60 * time.Second)
 					data, err = f.Post("hosts", jsonText)
 					if err != nil {
-						log.Errorf("Error creating host, retrying in 60s, cycle !")
+						log.Errorf("Error creating host, retrying in 60s, cycle!")
 					} else {
 						return data, err
 					}
 				}
-				log.Errorf("Error creating host, giving up !")
+				log.Errorf("Error creating host, giving up!")
 				return nil, err
 			}
 		}
@@ -1089,25 +1090,25 @@ func foremanDelete(hostFqdn string) error {
 		hostId := strconv.FormatFloat(host["id"].(float64), 'f', -1, 64)
 		err := f.DeleteHost(hostId)
 		if err != nil {
-			log.Errorf("Error deleting host, retrying in 5s !")
+			log.Errorf("Error deleting host, retrying in 5s!")
 			time.Sleep(5 * time.Second)
 			err := f.DeleteHost(hostId)
 			if err != nil {
-				log.Errorf("Error deleting host, retrying in 15s !")
+				log.Errorf("Error deleting host, retrying in 15s!")
 				time.Sleep(15 * time.Second)
 				err := f.DeleteHost(hostId)
 				if err != nil {
-					log.Errorf("Error deleting host, retrying in 60s !")
+					log.Errorf("Error deleting host, retrying in 60s!")
 					for i := 1; i < 31; i++ {
 						time.Sleep(60 * time.Second)
 						err := f.DeleteHost(hostId)
 						if err != nil {
-							log.Errorf("Error deleting host, retrying in 60s !")
+							log.Errorf("Error deleting host, retrying in 60s!")
 						} else {
 							return err
 						}
 					}
-					log.Errorf("Error deleting host, giving up !")
+					log.Errorf("Error deleting host, giving up!")
 					return err
 				}
 			}
@@ -1120,25 +1121,25 @@ func foremanDelete(hostFqdn string) error {
 func foremanCreateResource(jsonText []byte, resource string) (map[string]interface{}, error) {
 	data, err := f.Post(resource, jsonText)
 	if err != nil {
-		log.Errorf("Error creating resource: " + resource + ", retrying in 5s !")
+		log.Errorf("Error creating resource: " + resource + ", retrying in 5s!")
 		time.Sleep(5 * time.Second)
 		data, err = f.Post(resource, jsonText)
 		if err != nil {
-			log.Errorf("Error creating resource: " + resource + ", retrying in 15s !")
+			log.Errorf("Error creating resource: " + resource + ", retrying in 15s!")
 			time.Sleep(15 * time.Second)
 			data, err = f.Post(resource, jsonText)
 			if err != nil {
-				log.Errorf("Error creating resource: " + resource + ", retrying in 60s !")
+				log.Errorf("Error creating resource: " + resource + ", retrying in 60s!")
 				for i := 1; i < 31; i++ {
 					time.Sleep(60 * time.Second)
 					data, err = f.Post(resource, jsonText)
 					if err != nil {
-						log.Errorf("Error creating resource: " + resource + ", retrying in 60s, cycle !")
+						log.Errorf("Error creating resource: " + resource + ", retrying in 60s, cycle!")
 					} else {
 						return data, err
 					}
 				}
-				log.Errorf("Error creating resource: " + resource + ", giving up !")
+				log.Errorf("Error creating resource: " + resource + ", giving up!")
 				return nil, err
 			}
 		}
@@ -1204,7 +1205,7 @@ func foremanUpdateParameters(host string, parameters map[string]string) (err err
 		jsonText, err := json.Marshal(hostMap)
 		data, err := f.Put("hosts/"+host, jsonText)
 		if err != nil {
-			log.Errorf("Failed to update host parameters in foreman !")
+			log.Errorf("Failed to update host parameters in foreman!")
 			return err
 		}
 		hostId := strconv.FormatFloat(data["id"].(float64), 'f', 0, 64)
@@ -1235,23 +1236,30 @@ func killPuppet() {
 		processPid := process.Pid
 		pid := fmt.Sprint(processPid)
 		if processName == "puppet" {
-			log.Debugf("Puppet agent detected applying configuration with pid " + pid + ", killing it !")
+			log.Debugf("Puppet agent detected applying configuration with pid " + pid + ", killing it!")
 			err := process.Kill()
 			if err != nil {
-				log.Debugf("Killing puppet agent failed !")
+				log.Debugf("Killing puppet agent failed!")
 			}
 			if _, err := os.Stat("/opt/puppetlabs/puppet/cache/state/agent_catalog_run.lock"); err == nil {
 				log.Debugf("puppet agent .lock file exists, removing")
 				e := os.Remove("/opt/puppetlabs/puppet/cache/state/agent_catalog_run.lock")
 				if e != nil {
 					log.Errorf("Could not remove puppet agent .lock")
-				} else{
+				} else {
 					log.Debugf("puppet agent .lock removed")
 				}
-			 } else {
+			} else {
 				log.Debugf("puppet agent .lock file does not exists, nothing to do")
-			 }
+			}
 			processcount++
 		}
 	}
+}
+
+func wait(seconds int) {
+	inTime := time.Duration(seconds)
+
+	fmt.Printf("I'll try to run Puppet again after %d seconds...\n", seconds)
+	time.Sleep(inTime * time.Second)
 }
