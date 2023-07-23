@@ -66,7 +66,7 @@ var createCmd = &cobra.Command{
 	Short: "Create a new stackconf host",
 	Long:  `Create a new stackconf host.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		log.Debugf("Create command: starting, version 0.1.28")
+		log.Debugf("Create command: starting, version 0.1.29")
 		if noop {
 			log.Debugf("NOOP ENABLED! This create run will not do any changes.")
 		}
@@ -514,6 +514,8 @@ var createCmd = &cobra.Command{
 					log.Debugf("Puppet run timeout reached, killing puppet!")
 					cmd.Process.Kill()
 					killPuppet()
+
+					wait(viper.GetInt("puppet.config.sleep"))
 				case res := <-c1:
 					if res != nil {
 						if exitError, ok := err.(*exec.ExitError); ok {
@@ -1237,7 +1239,7 @@ func killPuppet() {
 			log.Debugf("Puppet agent detected applying configuration with pid " + pid + ", killing it!")
 			err := process.Kill()
 			if err != nil {
-				log.Debugf("Killing puppet agent failed !")
+				log.Debugf("Killing puppet agent failed!")
 			}
 			if _, err := os.Stat("/opt/puppetlabs/puppet/cache/state/agent_catalog_run.lock"); err == nil {
 				log.Debugf("puppet agent .lock file exists, removing")
@@ -1253,4 +1255,11 @@ func killPuppet() {
 			processcount++
 		}
 	}
+}
+
+func wait(seconds int) {
+	inTime := time.Duration(seconds)
+
+	fmt.Printf("I'll try to run Puppet again after %d seconds...\n", seconds)
+	time.Sleep(inTime * time.Second)
 }

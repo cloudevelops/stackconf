@@ -213,25 +213,25 @@ func foremanDel(hostFqdn string) error {
 		hostId := strconv.FormatFloat(host["id"].(float64), 'f', -1, 64)
 		err := fo.DeleteHost(hostId)
 		if err != nil {
-			log.Errorf("Error deleting host, retrying in 5s !")
+			log.Errorf("Error deleting host, retrying in 5s!")
 			time.Sleep(5 * time.Second)
 			err := fo.DeleteHost(hostId)
 			if err != nil {
-				log.Errorf("Error deleting host, retrying in 15s !")
+				log.Errorf("Error deleting host, retrying in 15s!")
 				time.Sleep(15 * time.Second)
 				err := fo.DeleteHost(hostId)
 				if err != nil {
-					log.Errorf("Error deleting host, retrying in 60s !")
+					log.Errorf("Error deleting host, retrying in 60s!")
 					for i := 1; i < 31; i++ {
 						time.Sleep(60 * time.Second)
 						err := fo.DeleteHost(hostId)
 						if err != nil {
-							log.Errorf("Error deleting host, retrying in 60s !")
+							log.Errorf("Error deleting host, retrying in 60s!")
 						} else {
 							return err
 						}
 					}
-					log.Errorf("Error deleting host, giving up !")
+					log.Errorf("Error deleting host, giving up!")
 					return err
 				}
 			}
